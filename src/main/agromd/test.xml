@@ -1,0 +1,29 @@
+
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<USSDResponse>
+    <TransactionId>19827144</TransactionId>
+    <TransactionTime>2017-11-13 02:35:19</TransactionTime>
+    <USSDResponseString>
+        1: English
+        2: Acooli
+        3: Luganda
+    </USSDResponseString>
+    <USSDAction>request</USSDAction>
+</USSDResponse>
+
+
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<USSDResponse>
+    <TransactionId>38830773</TransactionId>
+    <TransactionTime>2017-11-13 02:50:45</TransactionTime>
+    <USSDResponseString>
+        1: Find buyers
+        2: Market prices
+        3: Trading now
+        4: Inputs & tools
+        5: Farming on your phone
+        6: Weather
+        7: Get Advice
+    </USSDResponseString>
+    <USSDAction>request</USSDAction>
+</USSDResponse>

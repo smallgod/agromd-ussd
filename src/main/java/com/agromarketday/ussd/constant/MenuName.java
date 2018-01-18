@@ -1,0 +1,107 @@
+package com.agromarketday.ussd.constant;
+
+import com.agromarketday.ussd.exception.MyCustomException;
+import com.agromarketday.ussd.sharedInterface.Constants;
+import com.agromarketday.ussd.util.GeneralUtils;
+
+/**
+ *
+ * @author smallgod
+ */
+public enum MenuName implements Constants {
+
+    LANGUAGE_MENU("LANGUAGE_MENU"), //No menu - represents beginning of dial
+    MAIN_MENU("MAIN_MENU"),
+    SELECTED_PRODUCE("PRODUCE_NAME"),
+    SELECT_ITEM_TYPE("SELECT_ITEM_TYPE"),
+    FISH_TYPE("FISH_TYPE"),
+    ITEM_PLACE("ITEM_PLACE"),
+    QUANTITY("QUANTITY"),
+    PRICE("PRICE"),
+    PAY_METHOD("PAY_METHOD"),
+    TRANSPORT("TRANSPORT"),
+    CONFIRM("CONFIRM"),
+    START("START"),
+    END("END"),
+    ERROR_MENU("ERROR_MENU"),
+    UPLOAD_MSG("UPLOAD_MSG"),
+    MY_ACCOUNT("MY_ACCOUNT"),
+    UNDER_MAINTENANCE("UNDER_MAINTENANCE"),
+    CONTINUE_SESSION("CONTINUE_SESSION"),
+    ENTERED_PRODUCE("ENTERED_PRODUCE"),
+    CUSTOM_PRODUCE_NAME("CUSTOM_PRODUCE_NAME"),
+    PRODUCT_DESCRIPTION("PRODUCT_DESCRIPTION"),
+    MATCHED_PRODUCTS("MATCHED_PRODUCTS"),
+    BUYER_LOCATION("BUYER_LOCATION"),
+    BUYER_LIST("BUYER_LIST"),
+    CONTACT_BUYER("CONTACT_BUYER"),
+    CONTACT_BUYER_MESSAGE("CONTACT_BUYER_MESSAGE"),
+    SELLING_CATEGORIES("SELLING_CATEGORIES"),
+    ITEM_CATEGORIES("ITEM_CATEGORIES"),
+    REGION("REGION"),
+    SELLING_REGION_CENTRAL("SELLING_REGION_CENTRAL"),
+    SELLING_REGION_EASTERN("SELLING_REGION_EASTERN"),
+    SELLER_LIST("SELLER_LIST"),
+    CONTACT_SELLER("CONTACT_SELLER"),
+    COMMODITY_PRICE("COMMODITY_PRICE"),
+    COMMODITY_PRICE_REGION("COMMODITY_PRICE_REGION"),
+    COMMODITY_PRICE_DISPLAY("COMMODITY_PRICE_DISPLAY"),
+    MARKET_PRICE_REGION("MARKET_PRICE_REGION"),
+    MARKETS("MARKETS"),
+    MARKET_PRICES("MARKET_PRICES"),
+    MARKET_PRICES_END("MARKET_PRICES_END"),
+    MARKET_SERVICES("MARKET_SERVICES"),
+    INPUT_TOOLS("INPUT_TOOLS"),
+    INPUT_TOOLS_LIST("INPUT_TOOLS_LIST"),
+    INPUT_TOOLS_FILTERBY("INPUT_TOOLS_FILTERBY"),
+    CHECK_OUT_PAGE("CHECK_OUT_PAGE"),
+    INPUT_TOOLS_SELLER_LIST("INPUT_TOOLS_SELLER_LIST"),
+    INPUT_TOOLS_FILTERBY_DISTRICT("INPUT_TOOLS_FILTERBY_DISTRICT"),
+    INPUT_TOOLS_FILTERBY_REGION("INPUT_TOOLS_FILTERBY_REGION"),
+    SUCCESS_PAGE("SUCCESS_PAGE"),
+    LEARNING_SUBCATEGORY3("LEARNING_SUBCATEGORY3"),
+    LEARNING_SUBCATEGORY2("LEARNING_SUBCATEGORY2"),
+    LEARNING_SUBCATEGORY1("LEARNING_SUBCATEGORY1"),
+    LEARNING_CATEGORIES("LEARNING_CATEGORIES"),
+    WEATHER_REGION("WEATHER_REGION"),
+    WEATHER_DISTRICT("WEATHER_REGION"),
+    ADVICE_TOPICS("ADVICE_TOPICS"),
+    ADVICE_QUERY("ADVICE_QUERY"),
+    BUYER_CATEGORY("BUYER_CATEGORY"),
+    REGISTER_NAME("REGISTER_NAME"),
+    REGISTER_DISTRICT("REGISTER_DISTRICT"),
+    ITEM_SUBCATEGORIES("ITEM_SUBCATEGORIES"),
+    CUSTOM_DISTRICT("CUSTOM_DISTRICT"),
+    MARKET_DISTRICTS("MARKET_DISTRICTS"),
+    SELLER_DISTRICTS("SELLER_DISTRICTS"),
+    NO_RECORDS("NO_RECORDS"),
+    CONTACT_SELLER_MESSAGE("CONTACT_SELLER_MESSAGE"),
+    MATCHED_BUYER_LIST("MATCHED_BUYER_LIST");
+
+    private final String enumValue;
+
+    MenuName(String enumValue) {
+        this.enumValue = enumValue;
+    }
+
+    @Override
+    public String getValue() {
+        return this.enumValue;
+    }
+
+    public static MenuName convertToEnum(String value) throws MyCustomException {
+
+        if (value != null) {
+
+            for (MenuName availableValue : MenuName.values()) {
+
+                if (value.equalsIgnoreCase(availableValue.getValue())) {
+                    return availableValue;
+                }
+            }
+        }
+
+        MyCustomException error = GeneralUtils.getSingleError(ErrorCode.NOT_SUPPORTED_ERR, "Unsupported Menu processor name", "Failed to convert menu processor: " + value + "to Enum");
+        throw error;
+    }
+}
