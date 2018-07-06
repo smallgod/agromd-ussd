@@ -7,18 +7,21 @@ import com.agromarketday.ussd.config.JobsConfig;
 import com.agromarketday.ussd.config.RemoteUnitConfig;
 import com.agromarketday.ussd.connect.HttpClientPool;
 import com.agromarketday.ussd.constant.APIMethodName;
-import com.agromarketday.ussd.constant.BuyerLocation;
+import com.agromarketday.ussd.constant.ItemLocation;
 import com.agromarketday.ussd.constant.ErrorCode;
+import com.agromarketday.ussd.constant.FarmingTipsCategories;
 import com.agromarketday.ussd.constant.ItemTag;
 import com.agromarketday.ussd.constant.MenuName;
 import com.agromarketday.ussd.constant.MenuType;
 import com.agromarketday.ussd.constant.NamedConstants;
 import com.agromarketday.ussd.constant.NavigationBar;
 import com.agromarketday.ussd.constant.NavigationInput;
+import com.agromarketday.ussd.constant.PersonToContact;
 import com.agromarketday.ussd.constant.Region;
 import com.agromarketday.ussd.constant.TransportArea;
 import com.agromarketday.ussd.constant.UssdFunction;
 import com.agromarketday.ussd.database.CustomHibernate;
+import com.agromarketday.ussd.database.HibernateUtils;
 import com.agromarketday.ussd.datamodel.AdAPIRequest;
 import com.agromarketday.ussd.datamodel.AgClient;
 import com.agromarketday.ussd.datamodel.AgLanguage;
@@ -26,6 +29,7 @@ import com.agromarketday.ussd.datamodel.AgUssdMenu;
 import com.agromarketday.ussd.datamodel.AgNavigation;
 import com.agromarketday.ussd.datamodel.AgMenuItemIndex;
 import com.agromarketday.ussd.datamodel.AgProduct;
+import com.agromarketday.ussd.datamodel.AgSession;
 import com.agromarketday.ussd.datamodel.DataItem;
 import com.agromarketday.ussd.datamodel.DynamicMenuItem;
 import com.agromarketday.ussd.datamodel.NextNavigation;
@@ -33,20 +37,22 @@ import com.agromarketday.ussd.datamodel.TitleAddition;
 import com.agromarketday.ussd.datamodel.UssdMenuComponents;
 import com.agromarketday.ussd.datamodel.json.CheckAccountRequest;
 import com.agromarketday.ussd.datamodel.json.CheckAccountResponse;
-import com.agromarketday.ussd.datamodel.json.ContactBuyerRequest;
 import com.agromarketday.ussd.datamodel.json.ContactResponse;
 import com.agromarketday.ussd.datamodel.json.ContactRequest;
 import com.agromarketday.ussd.datamodel.json.CreateAccountRequest;
 import com.agromarketday.ussd.datamodel.json.CreateAccountResponse;
 import com.agromarketday.ussd.datamodel.json.Credentials;
-import com.agromarketday.ussd.datamodel.json.GetBuyerRequest;
 import com.agromarketday.ussd.datamodel.json.GetBuyerResponse;
 import com.agromarketday.ussd.datamodel.json.GetCategoryRequest;
 import com.agromarketday.ussd.datamodel.json.GetCategoryResponse;
-import com.agromarketday.ussd.datamodel.json.GetSellersRequest;
-import com.agromarketday.ussd.datamodel.json.GetSellersResponse;
-import com.agromarketday.ussd.datamodel.json.GetSellersResponse.Data.SellerDistrict;
-import com.agromarketday.ussd.datamodel.json.GetSellersResponse.Data.SellerDistrict.Seller;
+import com.agromarketday.ussd.datamodel.json.GetFarmingTipsRequest;
+import com.agromarketday.ussd.datamodel.json.GetFarmingTipsResponse;
+import com.agromarketday.ussd.datamodel.json.GetBuyerSellerRequest;
+import com.agromarketday.ussd.datamodel.json.GetBuyerSellerResponse;
+import com.agromarketday.ussd.datamodel.json.GetBuyerSellerResponse.Data.SellerDistrict;
+import com.agromarketday.ussd.datamodel.json.GetBuyerSellerResponse.Data.SellerDistrict.Contacts;
+import com.agromarketday.ussd.datamodel.json.GetDistrictRequest;
+import com.agromarketday.ussd.datamodel.json.GetDistrictResponse;
 import com.agromarketday.ussd.datamodel.json.MarketPriceResponse;
 import com.agromarketday.ussd.datamodel.json.MarketPriceRequest;
 import com.agromarketday.ussd.datamodel.json.ItemUploadRequest;
@@ -68,7 +74,6 @@ import com.agromarketday.ussd.sharedInterface.HasChildrenItems;
 import com.agromarketday.ussd.sharedInterface.MenuItem;
 import com.agromarketday.ussd.util.DateUtils;
 import com.agromarketday.ussd.util.GeneralUtils;
-import static com.agromarketday.ussd.util.GeneralUtils.convertFromJson;
 import static com.agromarketday.ussd.util.GeneralUtils.getRequestInfo;
 import static com.agromarketday.ussd.util.GeneralUtils.toPrettyJson;
 import com.agromarketday.ussd.util.ItemNodeComparator;
@@ -83,6 +88,15 @@ import java.util.Map;
 import java.util.Set;
 import javax.servlet.http.HttpServletRequest;
 import java.util.concurrent.ExecutorService;
+import static com.agromarketday.ussd.util.GeneralUtils.convertFromJson;
+import com.agromarketday.ussd.util.ProcessorUtils;
+import static com.agromarketday.ussd.util.ProcessorUtils.getCurrentMenuData;
+import static com.agromarketday.ussd.util.ProcessorUtils.popMostRecentMenuFromHistory;
+import java.util.concurrent.TimeUnit;
+import org.joda.time.LocalDateTime;
+import static com.agromarketday.ussd.util.GeneralUtils.convertFromJson;
+import static com.agromarketday.ussd.util.ProcessorUtils.checkIfContinueSession;
+import static com.agromarketday.ussd.util.ProcessorUtils.refreshMenuHistory;
 
 /**
  *
@@ -102,7 +116,9 @@ public class JsonProcessor implements HttpUnitController {
     private final CustomJobScheduler jobScheduler;
 
     private final int DEFAULT_ITEMS_PER_SCREEN = 8; //items to display per screen
-    private final int SELLER_ITEMS_PER_SCREEN = 6;
+    private final int SIX_ITEMS_PER_SCREEN = 6;
+    private final int FOUR_ITEMS_PER_SCREEN = 4;
+    private final int THREE_ITEMS_PER_SCREEN = 3;
 
     private static final LoggerUtil logger = new LoggerUtil(JsonProcessor.class);
 
@@ -225,22 +241,101 @@ public class JsonProcessor implements HttpUnitController {
     }
 
     NextNavigation processMenuRequest(
-            String msisdn, String requestInput, String sessionId,
+            String msisdn,
+            String requestInput,
+            String sessionId,
             boolean isNewSession) throws MyCustomException {
 
         NextNavigation nextNavigation;
 
-        //first userContact dial or unknown userContact
+        LocalDateTime startTime = DateUtils.getDateTimeNow();
+        //estimated time user spends on a screen
+        LocalDateTime endTime = startTime.plusSeconds(10);
+
+        AgSession session = new AgSession();
+
         if (isNewSession) {
 
-            nextNavigation = setStartUssdMenu(msisdn, sessionId);
+            try {
+
+                nextNavigation = setStartUssdMenu(msisdn, sessionId);
+                AgClient client = nextNavigation.getNavig().getClient();
+
+                session.setClient(client);
+                session.setSessionId(sessionId);
+                session.setSessionStartTime(startTime);
+
+            } catch (MyCustomException ex) {
+
+                logger.error("An unexpecred error occurred: " + ex.getMessage());
+                String response = "Set language/Londa olulimi\n1: English";
+
+                AgNavigation navigation = HibernateUtils
+                        .getNavigationByMsisdn(internalDbAccess, msisdn);
+                navigation.setMenuHistory("{}");
+                nextNavigation = new NextNavigation(navigation, response, false);
+
+            }
 
         } else {
-            nextNavigation = processUSSDMenu(requestInput, msisdn, sessionId);
+
+            session = HibernateUtils.getSessionById(internalDbAccess, sessionId);
+            startTime = session.getSessionStartTime();
+
+            AgNavigation navigation = HibernateUtils
+                    .getNavigationByMsisdn(internalDbAccess, msisdn);
+
+            try {
+
+                nextNavigation = processUSSDMenu(requestInput, msisdn, sessionId);
+
+            } catch (MyCustomException exc) {
+
+                logger.error("An error occurred trying to get next menu: " + exc.getMessage());
+
+                try {
+                    nextNavigation = navigateToMainMenu(msisdn, navigation);
+
+                } catch (MyCustomException ex) {
+
+                    logger.error("An unexpecred error occurred inside another error: " + ex.getMessage());
+
+                    String response = "Sorry, something unexpected occurred.\nEnter 00 to go back to main menu\n\n00: menu";
+
+                    nextNavigation = new NextNavigation(navigation, response, false);
+                }
+            }
         }
 
-        internalDbAccess.saveOrUpdateEntity(nextNavigation.getNavig());
+        int sessionLength = DateUtils
+                .getTimeTakenBetweenTwoDates(startTime, endTime, TimeUnit.SECONDS);
+
+        AgNavigation navigation = nextNavigation.getNavig();
+        session.setSessionEndTime(endTime);
+        session.setMenuHistory(navigation.getMenuHistory());
+
+        internalDbAccess.saveOrUpdateEntity(session);
+        internalDbAccess.saveOrUpdateEntity(navigation);
+
         return nextNavigation;
+    }
+
+    NextNavigation navigateToMainMenu(String msisdn, AgNavigation navigation) throws MyCustomException {
+
+        AgLanguage language = navigation.getClient().getLanguage();
+        Map<String, String> menuNodes = getLocalisedMenuNodes(language);
+
+        AgUssdMenu ussdMenu = retrieveMenuFromDB(MenuName.MAIN_MENU);
+        String menuTitle = convertMenuNodeToString(ussdMenu.getMenuTitleText(),
+                menuNodes);
+        ussdMenu.setMenuTitleText(menuTitle);
+
+        NextNavigation nextNavigation = navigateTo(navigation, menuNodes,
+                new LinkedList<>(), ussdMenu,
+                NavigationBar.NONE, false, false, 1, 1);
+
+        return nextNavigation;
+
     }
 
     private String getChosenStaticMenuItem(AgUssdMenu menu, String requestInput)
@@ -290,25 +385,45 @@ public class JsonProcessor implements HttpUnitController {
 
         switch (oldCurrentMenu) {
 
+            case FARMING_TIPS_CATEGORY:
+                menuComponents = displayFarmingTopics(requestInput,
+                        msisdn, menuNodes, sessionID);
+                break;
+
+            case FARMING_TIPS_TOPICS:
+                menuComponents = displayFarmingChapters(requestInput,
+                        msisdn, menuNodes, sessionID);
+                break;
+
+            case FARMING_TIPS_CHAPTERS:
+                menuComponents = displayFarmingTipContent(requestInput,
+                        msisdn, menuNodes, sessionID);
+                break;
+
             case ITEM_CATEGORIES:
                 menuComponents = displaySubCategories(requestInput,
                         msisdn, menuNodes, sessionID);
                 break;
 
             case ITEM_SUBCATEGORIES:
-                menuComponents = displayRegions(requestInput,
+                menuComponents = displayMenuAfterSubCategories(requestInput,
                         msisdn, menuNodes, sessionID);
                 break;
 
-            case MARKET_DISTRICTS:
+            case MARKET_DISTRICT_PRICES:
 //                menuComponents = displayMarkets(requestInput,
 //                        msisdn, menuNodes, sessionID);
                 menuComponents = displayMarketPricesEnd(requestInput,
                         msisdn, menuNodes, sessionID);
                 break;
 
-            case SELLER_DISTRICTS:
-                menuComponents = displaySellerList(requestInput,
+            case SELECT_DISTRICT:
+                menuComponents = processDistrict(requestInput,
+                        msisdn, menuNodes, sessionID);
+                break;
+
+            case BUYER_SELLER_DISTRICTS:
+                menuComponents = displayBuyerSellerList(requestInput,
                         msisdn, menuNodes, sessionID);
                 break;
 
@@ -317,13 +432,13 @@ public class JsonProcessor implements HttpUnitController {
                         msisdn, menuNodes, sessionID);
                 break;
 
-            case SELLER_LIST:
+            case BUYER_SELLER_LIST:
                 menuComponents = contactSeller(requestInput,
                         msisdn, menuNodes, sessionID);
                 break;
 
             case MATCHED_PRODUCTS:
-                menuComponents = displayMatchedBuyerLocation(requestInput,
+                menuComponents = displayItemLocation(requestInput,
                         msisdn, menuNodes, sessionID);
                 break;
 
@@ -497,17 +612,24 @@ public class JsonProcessor implements HttpUnitController {
                     AgProduct product = saveNewProduct(msisdn, newSessionID,
                             ItemTag.UNKNOWN, UssdFunction.FIND_BUYERS);
 
-                    menuComponents = displayItemSuperTypes(requestInput,
-                            msisdn, menuNodes, newSessionID, isRegistered, product);
+                    menuComponents = displayCategories(requestInput,
+                            newSessionID, menuNodes, product, ItemTag.PRODUCE,
+                            isRegistered);
+
+//                    menuComponents = displayItemSuperTypes(requestInput,
+//                            msisdn, menuNodes, newSessionID, isRegistered, product);
                     break;
 
                 case "1008": //Sell an item
                     product = saveNewProduct(msisdn, newSessionID,
                             ItemTag.PRODUCE, UssdFunction.SELL);
 
-                    menuComponents = displayItemSuperTypes(requestInput, msisdn,
-                            menuNodes, newSessionID, isRegistered, product);
+                    menuComponents = displayCategories(requestInput,
+                            newSessionID, menuNodes, product, ItemTag.PRODUCE,
+                            isRegistered);
 
+//                    menuComponents = displayItemSuperTypes(requestInput, msisdn,
+//                            menuNodes, newSessionID, isRegistered, product);
                     break;
 
                 case "1019": //Market prices
@@ -516,7 +638,7 @@ public class JsonProcessor implements HttpUnitController {
                             ItemTag.PRODUCE, UssdFunction.MARKET_PRICES);
 
                     menuComponents = displayCategories(requestInput, newSessionID,
-                            menuNodes, product, ItemTag.PRODUCE);
+                            menuNodes, product, ItemTag.PRODUCE, isRegistered);
                     break;
 
                 case "1012": //Sellers/Traders
@@ -532,11 +654,18 @@ public class JsonProcessor implements HttpUnitController {
                             ItemTag.PRODUCE, UssdFunction.INPUT_TOOLS);
 
                     menuComponents = displayCategories(requestInput, newSessionID,
-                            menuNodes, product, ItemTag.INPUT);
+                            menuNodes, product, ItemTag.INPUT, isRegistered);
                     break;
 
                 case "1016": // Get Advice
                     responseMenu = getAdvice();
+                    break;
+
+                case "1014":
+
+                    saveNewProduct(msisdn, newSessionID, ItemTag.PRODUCE,
+                            UssdFunction.FARMING_TIPS);
+                    responseMenu = phoneFarming();
                     break;
 
                 case "1017":// My Account
@@ -547,9 +676,6 @@ public class JsonProcessor implements HttpUnitController {
 //                    responseMenu = marketPrices();
 //                    break;
 //
-//                case "1014":
-//                    responseMenu = phoneFarming();
-//                    break;
 //
 //                case "1015":
 //                    responseMenu = weather();
@@ -568,21 +694,24 @@ public class JsonProcessor implements HttpUnitController {
 
                     product = fetchProduct(msisdn);
                     menuComponents = displayCategories(requestInput,
-                            newSessionID, menuNodes, product, ItemTag.PRODUCE);
+                            newSessionID, menuNodes, product, ItemTag.PRODUCE,
+                            isRegistered);
                     break;
 
                 case "1022": //VAP
 
                     product = fetchProduct(msisdn);
                     menuComponents = displayCategories(requestInput,
-                            newSessionID, menuNodes, product, ItemTag.VAP);
+                            newSessionID, menuNodes, product, ItemTag.VAP,
+                            isRegistered);
                     break;
 
                 case "1023": //Inputs
 
                     product = fetchProduct(msisdn);
                     menuComponents = displayCategories(requestInput,
-                            newSessionID, menuNodes, product, ItemTag.INPUT);
+                            newSessionID, menuNodes, product, ItemTag.INPUT,
+                            isRegistered);
                     break;
 
                 case "1181":
@@ -606,6 +735,11 @@ public class JsonProcessor implements HttpUnitController {
                     break;
 
                 case "1185":
+                    menuComponents = processRegion(requestInput,
+                            msisdn, menuNodes, newSessionID);
+                    break;
+
+                case "1186":
                     menuComponents = processRegion(requestInput,
                             msisdn, menuNodes, newSessionID);
                     break;
@@ -649,23 +783,38 @@ public class JsonProcessor implements HttpUnitController {
                     product = saveNewProduct(msisdn, newSessionID,
                             ItemTag.PRODUCE, UssdFunction.MATCHED_BUYERS);
 
-                    menuComponents = displayMatchedBuyers(requestInput, newSessionID,
-                            menuNodes, product, ItemTag.PRODUCE);
+//                    menuComponents = displayMatchedBuyers(requestInput, newSessionID,
+//                            menuNodes, product, ItemTag.PRODUCE);
+                    menuComponents = displayCategories(requestInput,
+                            newSessionID, menuNodes, product, ItemTag.PRODUCE,
+                            isRegistered);
+
                     break;
 
                 case "1131":
-                    menuComponents = processBuyerLocation(requestInput,
+//                    menuComponents = processBuyerLocation(requestInput,
+//                            msisdn, menuNodes, newSessionID);
+
+                    menuComponents = displayBuyerSellerList(requestInput,
                             msisdn, menuNodes, newSessionID);
                     break;
 
                 case "1132":
-                    menuComponents = processBuyerLocation(requestInput,
+                    menuComponents = displayBuyerSellerList(requestInput,
                             msisdn, menuNodes, newSessionID);
                     break;
 
                 case "1133":
-                    menuComponents = processBuyerLocation(requestInput,
+                    menuComponents = displayBuyerSellerList(requestInput,
                             msisdn, menuNodes, newSessionID);
+                    break;
+
+                case "1371":
+                    //responseMenu = learningCategory();
+                    product = fetchProduct(msisdn);
+                    product.setFarmingTipsCategory(FarmingTipsCategories.FISH);
+                    menuComponents = displayFarmingTips(requestInput, newSessionID,
+                            menuNodes, product, ItemTag.PRODUCE, isRegistered);
                     break;
 
                 case "1107":
@@ -716,14 +865,6 @@ public class JsonProcessor implements HttpUnitController {
                 case "1106":
                     responseMenu = underMaintenance();
                     navBar = NavigationBar.MAIN;
-                    break;
-
-                case "1121":
-                    responseMenu = catFishBuyers();//get from remote/DB
-                    break;
-
-                case "1122":
-                    responseMenu = tilapiaBuyers();//get from remote/DB
                     break;
 
                 case "1141":
@@ -974,11 +1115,7 @@ public class JsonProcessor implements HttpUnitController {
                     break;
 
                 case "1361":
-                    responseMenu = JsonProcessor.this.confirm();
-                    break;
-
-                case "1371":
-                    responseMenu = learningCategory();
+                    responseMenu = confirm();
                     break;
 
                 case "1381":
@@ -1090,18 +1227,18 @@ public class JsonProcessor implements HttpUnitController {
         return menuComponents;
     }
 
-//    AgProduct fetchProduct(String sessionId, String sellerContact)
+//    AgProduct fetchProduct(String sessionId, String sellerBuyerContact)
 //            throws MyCustomException {
 //
 //        Set<Object> sessionIds = new HashSet<>();
 //        sessionIds.add(sessionId);
 //
 //        Set<Object> sellerContacts = new HashSet<>();
-//        sellerContacts.add(sellerContact);
+//        sellerContacts.add(sellerBuyerContact);
 //
 //        Map<String, Set<Object>> propertyNameValues = new HashMap<>();
 //        propertyNameValues.put("sessionId", sessionIds);
-//        propertyNameValues.put("sellerContact", sellerContacts);
+//        propertyNameValues.put("sellerBuyerContact", sellerContacts);
 //
 //        AgProduct product = internalDbAccess
 //                .fetchEntity(AgProduct.class, propertyNameValues);
@@ -1136,19 +1273,20 @@ public class JsonProcessor implements HttpUnitController {
         return menuComponents;
     }
 
-    CreateAccountResponse registerClient(AgClient client)
+    CreateAccountResponse registerClientRemote(AgClient client)
             throws MyCustomException {
 
         String msisdn = client.getMsisdn();
         String name = client.getName();
         String district = client.getDistrict();
+        int districtId = client.getDistrictId();
 
         CreateAccountRequest createAccount = new CreateAccountRequest();
 
         CreateAccountRequest.Params params = createAccount.new Params();
         params.setMsisdn(msisdn);
         params.setName(name);
-        params.setDistrict(district);
+        params.setDistrictId(districtId);
 
         Credentials credentials = new Credentials();
         credentials.setApiPassword("");
@@ -1188,12 +1326,14 @@ public class JsonProcessor implements HttpUnitController {
 
         client.setDistrict(requestInput);
         client.setIsRegistered(Boolean.TRUE);
-        registerClient(client);
         internalDbAccess.saveOrUpdateEntity(client);
 
+        registerClientRemote(client);
+
         UssdMenuComponents menuComponents
-                = getUssdMenuComponentsHelper(MenuName.MAIN_MENU, menuNodes);
-        menuComponents.setNavBar(NavigationBar.PREVIOUS_AND_MAIN);
+                = getUssdMenuComponentsHelper(
+                        MenuName.SUCCESS_REGISTRATION, menuNodes);
+        menuComponents.setNavBar(NavigationBar.MAIN);
 
         return menuComponents;
     }
@@ -1207,6 +1347,35 @@ public class JsonProcessor implements HttpUnitController {
         AgProduct product = fetchProduct(clientMsisdn);
         product.setItemName(requestInput);
 
+        internalDbAccess.saveOrUpdateEntity(product);
+
+        UssdMenuComponents menuComponents
+                = getUssdMenuComponentsHelper(responseMenu, menuNodes);
+        menuComponents.setNavBar(NavigationBar.PREVIOUS_AND_MAIN);
+
+        return menuComponents;
+    }
+
+    UssdMenuComponents processDistrict(String requestInput,
+            String msisdn, Map<String, String> menuNodes,
+            String newSessionID) throws MyCustomException {
+
+        MenuName responseMenu = MenuName.PRODUCT_DESCRIPTION;
+
+        AgNavigation navigation = HibernateUtils
+                .getNavigationByMsisdn(internalDbAccess, msisdn);
+
+        MenuHistory menuHistory
+                = getMenuHistoryHelper(navigation.getMenuHistory());
+        MenuHistory.Data menuData = getCurrentMenuData(menuHistory);
+
+        DataItem data = getDataValue(menuData, requestInput);
+        String marketName = data.getDataValue();
+        String marketId = data.getDataId();
+
+        AgProduct product = fetchProduct(msisdn);
+        product.setDistrictId(Integer.valueOf(marketId));
+        product.setDistrictName(marketName);
         internalDbAccess.saveOrUpdateEntity(product);
 
         UssdMenuComponents menuComponents
@@ -1238,7 +1407,8 @@ public class JsonProcessor implements HttpUnitController {
             String clientMsisdn, Map<String, String> menuNodes,
             String newSessionID) throws MyCustomException {
 
-        MenuName responseMenu = MenuName.ITEM_PLACE;
+        //MenuName responseMenu = MenuName.ITEM_PLACE;
+        MenuName responseMenu = MenuName.QUANTITY;
 
         AgProduct productSale = fetchProduct(clientMsisdn);
         productSale.setItemDescription(requestInput);
@@ -1325,9 +1495,31 @@ public class JsonProcessor implements HttpUnitController {
     }
 
     ScreenPagination paginateData(Set<? extends MenuItem> catList,
-            int itemsPerScreen) {
+            int itemsPerScreen, AgProduct product) {
 
-        int categoryCount = catList.size();
+        UssdFunction function = product.getUssdFunction();
+
+        Set<MenuItem> cleanList = new HashSet<>();
+
+        for (MenuItem element : catList) {
+
+            if ((product.getUssdFunction() == UssdFunction.FIND_BUYERS
+                    || product.getUssdFunction() == UssdFunction.SELLERS_TRADERS)
+                    && product.isIsConsiderCount()) {
+
+                if (element.getCount() > 0) {
+
+                    logger.debug("Adding element, with ID: " + element.getId()
+                            + ", name: " + element.getName());
+                    cleanList.add(new Item(element.getId(), element.getName()));
+                }
+
+            } else {
+                cleanList.add(new Item(element.getId(), element.getName()));
+            }
+        }
+
+        int categoryCount = cleanList.size();
 
         ScreenPagination screens = new ScreenPagination();
         List<ScreenPagination.Data> dataList = new LinkedList<>();
@@ -1346,19 +1538,21 @@ public class JsonProcessor implements HttpUnitController {
 
         List<ScreenPagination.Item> items = new LinkedList<>();
 
-        for (MenuItem element : catList) {
+        for (MenuItem element : cleanList) {
 
             perScreen--;
 
-            logger.debug("Quotient in: " + quotient);
+            String id = element.getId();
+            String name = element.getName();
+
+            if (function != UssdFunction.FIND_BUYERS) {
+                name = name.split("\\(")[0];
+            }
 
             ScreenPagination.Item item = screens.new Item();
 
-            logger.debug("ELEM ID: " + element.getId());
-            logger.debug("ELEM Nm: " + element.getName());
-
-            item.setId(element.getId());
-            item.setName(element.getName());
+            item.setId(id);
+            item.setName(name);
             //item.setExtra(element.getExtra());
 
             items.add(item);
@@ -1436,19 +1630,19 @@ public class JsonProcessor implements HttpUnitController {
 //        return menuItems;
 //    }
     Set<? extends MenuItem> filterSellersByDistrict(
-            GetSellersResponse.Data marketData, int districtId)
+            GetBuyerSellerResponse.Data marketData, int districtId)
             throws MyCustomException {
 
         Set<MenuItem> menuItems = new HashSet<>();
 
-        Set<GetSellersResponse.Data.SellerDistrict> districts
+        Set<GetBuyerSellerResponse.Data.SellerDistrict> districts
                 = marketData.getDistricts();
 
         if (districtId > 0) {
 
-            for (GetSellersResponse.Data.SellerDistrict district : districts) {
+            for (GetBuyerSellerResponse.Data.SellerDistrict district : districts) {
 
-                if (district.getId() == districtId) {
+                if (district.getId().equals(districtId)) {
                     menuItems.add(district);
                 }
             }
@@ -1470,24 +1664,136 @@ public class JsonProcessor implements HttpUnitController {
         return menuList;
     }
 
-    Set<? extends MenuItem> getCategories(GetCategoryResponse categories)
+    Set<? extends MenuItem> getFarmingTipsCategories(
+            GetFarmingTipsResponse categories)
             throws MyCustomException {
 
-        Set<? extends MenuItem> categoryMenuList = categories.getData().getProduce();
+        Set<? extends MenuItem> categoryMenuList = categories.getData();
 
         return categoryMenuList;
     }
 
-    Set<? extends MenuItem> getSubCategories(GetCategoryResponse categories,
-            int categoryId)
-            throws MyCustomException {
+    Set<? extends MenuItem> getCategories(GetCategoryResponse categories,
+            ItemTag tag) throws MyCustomException {
 
-        //        Set<? extends MenuItem> subCategories
-        //= getSubCategories(allInfo.getData().getProduce(), categoryId);
+        Set<? extends MenuItem> menuItemList;
+
+        switch (tag) {
+
+            case INPUT:
+                menuItemList = categories.getData().getInputs();
+                break;
+
+            case PRODUCE:
+                menuItemList = categories.getData().getProduce();
+                break;
+
+            case VAP:
+                menuItemList = categories.getData().getVap();
+                break;
+
+            default:
+                menuItemList = categories.getData().getProduce();
+                break;
+        }
+        return menuItemList;
+    }
+
+    Set<? extends MenuItem> getSubCategories(GetCategoryResponse categories,
+            ItemTag tag, int categoryId) throws MyCustomException {
+
+        Set<? extends HasChildrenItems> menuItemList;
+
+        switch (tag) {
+
+            case INPUT:
+                menuItemList = categories.getData().getInputs();
+                break;
+
+            case PRODUCE:
+                menuItemList = categories.getData().getProduce();
+                break;
+
+            case VAP:
+                menuItemList = categories.getData().getVap();
+                break;
+
+            default:
+                menuItemList = categories.getData().getProduce();
+                break;
+        }
+
         Set<? extends MenuItem> subCategories
-                = getChildrenMenuItems(categories.getData().getProduce(), categoryId);
+                = getChildrenMenuItems(menuItemList, categoryId);
 
         return subCategories;
+    }
+
+    Set<? extends MenuItem> getFarmingTopics(GetFarmingTipsResponse categories,
+            int categoryId) throws MyCustomException {
+
+        Set<MenuItem> menuItems = new HashSet<>();
+
+        for (GetFarmingTipsResponse.Data data : categories.getData()) {
+
+            if (data.getId().equals(categoryId)) {
+                menuItems.addAll(data.getTopics());
+            }
+        }
+        return menuItems;
+    }
+
+    Set<? extends MenuItem> getFarmingChapters(
+            GetFarmingTipsResponse categories, AgProduct product)
+            throws MyCustomException {
+
+        int categoryId = product.getFarmingTipCategoryId();
+        int topicId = product.getFarmingTipTopicId();
+
+        Set<MenuItem> menuItems = new HashSet<>();
+
+        for (GetFarmingTipsResponse.Data data : categories.getData()) {
+
+            if (data.getId().equals(categoryId)) {
+
+                for (GetFarmingTipsResponse.Topic topic : data.getTopics()) {
+
+                    if (topic.getId().equals(topicId)) {
+                        menuItems.addAll(topic.getChapters());
+                    }
+                }
+            }
+        }
+        return menuItems;
+    }
+
+    GetFarmingTipsResponse.Chapter getFarmingTipContent(
+            GetFarmingTipsResponse categories,
+            AgProduct product) throws MyCustomException {
+
+        String categoryId = String.valueOf(product.getFarmingTipCategoryId());
+        String topicId = String.valueOf(product.getFarmingTipTopicId());
+        String chapterId = String.valueOf(product.getFarmingTipChapterId());
+
+        for (GetFarmingTipsResponse.Data data : categories.getData()) {
+
+            if (data.getId().equals(categoryId)) {
+
+                for (GetFarmingTipsResponse.Topic topic : data.getTopics()) {
+
+                    if (topic.getId().equals(topicId)) {
+
+                        for (GetFarmingTipsResponse.Chapter chapter : topic.getChapters()) {
+
+                            if (chapter.getId().equals(chapterId)) {
+                                return chapter;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return null;
     }
 
     Set<? extends MenuItem> filterMarketsByDistrictAndProduct(
@@ -1495,8 +1801,8 @@ public class JsonProcessor implements HttpUnitController {
             throws MyCustomException {
 
         Region region = product.getRegion();
-        int districtId = product.getDistrictId();
-        int productId = product.getSubCategoryId();
+        String districtId = String.valueOf(product.getDistrictId());
+        String productId = String.valueOf(product.getSubCategoryId());
 
         Set<MenuItem> menuItems = new HashSet<>();
 
@@ -1509,11 +1815,11 @@ public class JsonProcessor implements HttpUnitController {
                     break;
                 }
 
-                if (district.getId() == districtId) {
+                if (district.getId().equals(districtId)) {
 
                     for (Product itemProduct : district.getProducts()) {
 
-                        if (productId == itemProduct.getId()) {
+                        if (productId.equals(itemProduct.getId())) {
                             menuItems.addAll(itemProduct.getMarkets());
                             return menuItems;
                         }
@@ -1530,8 +1836,8 @@ public class JsonProcessor implements HttpUnitController {
 
         Region region = product.getRegion();
         int districtId = product.getDistrictId();
-        int productId = product.getSubCategoryId();
-        int marketId = product.getMarketId();
+        String productId = String.valueOf(product.getSubCategoryId());
+        String marketId = String.valueOf(product.getMarketId());
 
         Set<MenuItem> menuItems = new HashSet<>();
 
@@ -1544,20 +1850,19 @@ public class JsonProcessor implements HttpUnitController {
                     break;
                 }
 
-                if (district.getId() == districtId) {
+                if (district.getId().equals(districtId)) {
 
                     for (Product itemProduct : district.getProducts()) {
 
-                        if (productId == itemProduct.getId()) {
+                        if (productId.equals(itemProduct.getId())) {
 
                             for (Product.Market market : itemProduct.getMarkets()) {
 
-                                if (marketId == market.getId()) {
+                                if (marketId.equals(market.getId())) {
                                     menuItems.addAll(market.getPrices());
                                     return menuItems;
                                 }
                             }
-
                         }
                     }
                 }
@@ -1566,34 +1871,76 @@ public class JsonProcessor implements HttpUnitController {
         return menuItems;
     }
 
-    Set<? extends MenuItem> filterSellersList(
-            GetSellersResponse.Data sellers,
+    Set<? extends MenuItem> filterBuyerSellersByLocation(
+            GetBuyerSellerResponse.Data data,
             AgProduct product)
             throws MyCustomException {
 
-        int districtId = product.getDistrictId();
+        String itemLocation = product.getItemLocation().name();
 
         Set<MenuItem> menuItems = new HashSet<>();
 
-        Set<GetSellersResponse.Data.SellerDistrict> districts
+        Set<GetBuyerSellerResponse.Data.SellerDistrict> districts
+                = data.getDistricts();
+
+        for (GetBuyerSellerResponse.Data.SellerDistrict district : districts) {
+
+            logger.debug("District Name: " + district.getName());
+            logger.debug("District Loc : " + district.getItemLocation());
+
+            if (district.getItemLocation().equals(itemLocation)) {
+
+                for (Contacts contact : district.getContacts()) {
+
+                    String contactName = contact.getName();
+                    String contactId = contact.getId();
+                    for (Contacts.Product aProduct : contact.getProducts()) {
+
+                        String unit = aProduct.getMeasureUnit();
+                        String price = aProduct.getPrice();
+                        String productId = aProduct.getId();
+                        String productName = aProduct.getName();
+
+                        menuItems.add(new Item(contactId + "-" + productId, contactName + " -"
+                                + productName + " -" + price + "/" + unit));
+                    }
+
+                }
+            }
+        }
+        return menuItems;
+    }
+
+    Set<? extends MenuItem> filterBuyerSellersByDistrict(
+            GetBuyerSellerResponse.Data sellers,
+            AgProduct product)
+            throws MyCustomException {
+
+        String districtId = String.valueOf(product.getDistrictId());
+        boolean isMatchedBuyer = product.isIsMatched();
+
+        Set<MenuItem> menuItems = new HashSet<>();
+
+        Set<GetBuyerSellerResponse.Data.SellerDistrict> districts
                 = sellers.getDistricts();
 
-        for (GetSellersResponse.Data.SellerDistrict district : districts) {
+        for (GetBuyerSellerResponse.Data.SellerDistrict district : districts) {
 
-            if (district.getId() == districtId) {
+            if (district.getId().equals(districtId)) {
 
-                for (Seller seller : district.getSellers()) {
+                for (Contacts seller : district.getContacts()) {
 
                     String sellerName = seller.getName();
+                    String sellerId = seller.getId();
 
-                    for (Seller.Product sellerProduct : seller.getProducts()) {
+                    for (Contacts.Product sellerProduct : seller.getProducts()) {
 
                         String unit = sellerProduct.getMeasureUnit();
-                        int price = sellerProduct.getPrice();
-                        int id = sellerProduct.getId();
+                        String price = sellerProduct.getPrice();
+                        String productId = sellerProduct.getId();
                         String productName = sellerProduct.getName();
 
-                        menuItems.add(new Item(id, sellerName + " -"
+                        menuItems.add(new Item(sellerId + "-" + productId, sellerName + " -"
                                 + productName + " -" + price + "/" + unit));
                     }
 
@@ -1609,7 +1956,7 @@ public class JsonProcessor implements HttpUnitController {
             AgProduct product)
             throws MyCustomException {
 
-        int productId = product.getSubCategoryId();
+        String productId = String.valueOf(product.getSubCategoryId());
 
         Set<MenuItem> menuItems = new HashSet<>();
 
@@ -1622,7 +1969,7 @@ public class JsonProcessor implements HttpUnitController {
                 //item.getBuyerLocation();
                 logger.debug("ProductId: " + productId + ", item.prodId: " + item.getProductId());
 
-                if (productId == item.getProductId()) {
+                if (productId.equals(item.getProductId())) {
                     // also check for location (nearby | national | interna..)
                     menuItems.add(data);
                 }
@@ -1631,20 +1978,20 @@ public class JsonProcessor implements HttpUnitController {
         return menuItems;
     }
 
-    Seller getSeller(GetSellersResponse.Data sellers,
+    Contacts getSeller(GetBuyerSellerResponse.Data sellers,
             AgProduct product) throws MyCustomException {
 
-        int districtId = product.getDistrictId();
-        int sellerId = product.getSellerId();
+        String districtId = String.valueOf(product.getDistrictId());
+        String sellerId = product.getSellerId();
 
         Set<SellerDistrict> districts = sellers.getDistricts();
 
         for (SellerDistrict district : districts) {
 
-            if (district.getId() == districtId) {
+            if (district.getId().equals(districtId)) {
 
-                for (Seller seller : district.getSellers()) {
-                    if (sellerId == seller.getId()) {
+                for (Contacts seller : district.getContacts()) {
+                    if (sellerId.equals(seller.getId())) {
                         return seller;
                     }
                 }
@@ -1656,23 +2003,60 @@ public class JsonProcessor implements HttpUnitController {
     GetBuyerResponse.Data getBuyer(GetBuyerResponse buyers,
             AgProduct product) throws MyCustomException {
 
-        int buyerId = product.getBuyerId();
+        String buyerId = product.getBuyerId();
         for (GetBuyerResponse.Data data : buyers.getData()) {
 
-            if (buyerId == data.getBuyerId()) {
+            if (buyerId .equals(data.getBuyerId())) {
                 return data;
             }
         }
         return null;
     }
 
+    UssdMenuComponents displayDistricts(String requestInput, String msisdn,
+            Map<String, String> menuNodes, String newSessionID, Region region)
+            throws MyCustomException {
+
+        MenuName responseMenu = MenuName.SELECT_DISTRICT;
+
+        AgNavigation navigation = HibernateUtils
+                .getNavigationByMsisdn(internalDbAccess, msisdn);
+
+        MenuHistory menuHistory
+                = getMenuHistoryHelper(navigation.getMenuHistory());
+        MenuHistory.Data menuData = getCurrentMenuData(menuHistory);
+
+        DataItem dataItem = getDataValue(menuData, requestInput);
+        String itemName = dataItem.getDataValue();
+        String itemId = dataItem.getDataId();
+
+        logger.debug("itemName: " + itemName + ", itemId: " + itemId);
+
+        AgProduct product = fetchProduct(msisdn);
+        product.setRegion(region);
+        internalDbAccess.saveOrUpdateEntity(product);
+
+        GetDistrictResponse districts = getDistrictsRemote(product);
+        cacheAllDistrictInfo(districts, product.getUserContact());
+
+        ScreenPagination screenPages = setDistrictsNavigation(product);
+
+        UssdMenuComponents menuComponents
+                = breakIntoPages(requestInput, responseMenu,
+                        menuNodes, newSessionID, screenPages,
+                        new TitleAddition(false, product.getRegion().name()));
+
+        return menuComponents;
+    }
+
     UssdMenuComponents displayMarketDistricts(String requestInput, String msisdn,
             Map<String, String> menuNodes, String newSessionID, Region region)
             throws MyCustomException {
 
-        MenuName responseMenu = MenuName.MARKET_DISTRICTS;
+        MenuName responseMenu = MenuName.MARKET_DISTRICT_PRICES;
 
-        AgNavigation navigation = getNavigationByMsisdn(msisdn);
+        AgNavigation navigation = HibernateUtils
+                .getNavigationByMsisdn(internalDbAccess, msisdn);
 
         MenuHistory menuHistory
                 = getMenuHistoryHelper(navigation.getMenuHistory());
@@ -1707,7 +2091,8 @@ public class JsonProcessor implements HttpUnitController {
 
         MenuName responseMenu = MenuName.MARKETS;
 
-        AgNavigation navigation = getNavigationByMsisdn(msisdn);
+        AgNavigation navigation = HibernateUtils
+                .getNavigationByMsisdn(internalDbAccess, msisdn);
 
         MenuHistory menuHistory
                 = getMenuHistoryHelper(navigation.getMenuHistory());
@@ -1738,7 +2123,8 @@ public class JsonProcessor implements HttpUnitController {
 
         MenuName responseMenu = MenuName.MARKET_PRICES_END;
 
-        AgNavigation navigation = getNavigationByMsisdn(msisdn);
+        AgNavigation navigation = HibernateUtils
+                .getNavigationByMsisdn(internalDbAccess, msisdn);
 
         MenuHistory menuHistory
                 = getMenuHistoryHelper(navigation.getMenuHistory());
@@ -1769,8 +2155,8 @@ public class JsonProcessor implements HttpUnitController {
         product.setItemName(name);
         internalDbAccess.saveOrUpdateEntity(product);
 
-//       MarketPriceResponse markets = getMarketPricesCached(navigation);
-//       MarketPriceResponse.Data priceData = getProduct(markets, 
+//       MarketPriceResponse districts = getMarketPricesCached(navigation);
+//       MarketPriceResponse.Data priceData = getProduct(districts, 
 //                Integer.valueOf(dataId));
         String titleAdd = "\n"
                 + "Item : " + name + "\n"
@@ -1792,7 +2178,7 @@ public class JsonProcessor implements HttpUnitController {
 
         for (MarketPriceResponse.Data item : data.getData()) {
 
-            if (item.getId() == productId) {
+            if (item.getId() == String.valueOf(productId)) {
 
                 return item;
             }
@@ -1806,7 +2192,8 @@ public class JsonProcessor implements HttpUnitController {
 
         MenuName responseMenu = MenuName.MARKET_PRICES;
 
-        AgNavigation navigation = getNavigationByMsisdn(msisdn);
+        AgNavigation navigation = HibernateUtils
+                .getNavigationByMsisdn(internalDbAccess, msisdn);
 
         MenuHistory menuHistory
                 = getMenuHistoryHelper(navigation.getMenuHistory());
@@ -1832,13 +2219,14 @@ public class JsonProcessor implements HttpUnitController {
         return menuComponents;
     }
 
-    UssdMenuComponents displaySellerList(String requestInput,
+    UssdMenuComponents displayBuyerSellerList(String requestInput,
             String msisdn, Map<String, String> menuNodes,
             String newSessionID) throws MyCustomException {
 
-        MenuName responseMenu = MenuName.SELLER_LIST;
+        MenuName responseMenu = MenuName.BUYER_SELLER_LIST;
 
-        AgNavigation navigation = getNavigationByMsisdn(msisdn);
+        AgNavigation navigation = HibernateUtils
+                .getNavigationByMsisdn(internalDbAccess, msisdn);
 
         MenuHistory menuHistory
                 = getMenuHistoryHelper(navigation.getMenuHistory());
@@ -1849,12 +2237,23 @@ public class JsonProcessor implements HttpUnitController {
         String dataId = data.getDataId();
 
         AgProduct product = fetchProduct(msisdn);
-        product.setDistrictId(Integer.valueOf(dataId));
-        product.setDistrictName(dataName);
-        internalDbAccess.saveOrUpdateEntity(product);
 
-        ScreenPagination screenPages = setSellersNavigation(product);
-        String title = "\n" + product.getItemName() + " - " + dataName;
+        if (product.getUssdFunction() == UssdFunction.MATCHED_BUYERS
+                || product.getUssdFunction() == UssdFunction.FIND_BUYERS) {
+
+            ItemLocation itemLocation = getItemLocationHelper(requestInput);
+            product.setItemLocation(itemLocation);
+            dataName = itemLocation.getValue();
+
+        } else {
+            product.setDistrictId(Integer.valueOf(dataId));
+            product.setDistrictName(dataName);
+        }
+        internalDbAccess.saveOrUpdateEntity(product);
+        ScreenPagination screenPages = setBuyerSellersNavigation(product);
+
+        String title = product.getItemName() + " - " + dataName + "\n";
+
         UssdMenuComponents menuComponents
                 = breakIntoPages(requestInput, responseMenu,
                         menuNodes, newSessionID, screenPages,
@@ -1863,13 +2262,14 @@ public class JsonProcessor implements HttpUnitController {
         return menuComponents;
     }
 
-    UssdMenuComponents displaySellerDistricts(String requestInput, String msisdn,
+    UssdMenuComponents displayBuyerSellerDistricts(String requestInput, String msisdn,
             Map<String, String> menuNodes, String newSessionID, Region region)
             throws MyCustomException {
 
-        MenuName responseMenu = MenuName.SELLER_DISTRICTS;
+        MenuName responseMenu = MenuName.BUYER_SELLER_DISTRICTS;
 
-        AgNavigation navigation = getNavigationByMsisdn(msisdn);
+        AgNavigation navigation = HibernateUtils
+                .getNavigationByMsisdn(internalDbAccess, msisdn);
 
         MenuHistory menuHistory
                 = getMenuHistoryHelper(navigation.getMenuHistory());
@@ -1883,10 +2283,10 @@ public class JsonProcessor implements HttpUnitController {
         product.setRegion(region);
         internalDbAccess.saveOrUpdateEntity(product);
 
-        GetSellersResponse sellers = getSellersBuyersRemote(product);
-        cacheAllSellersInfo(sellers, product.getUserContact());
+        GetBuyerSellerResponse sellers = getSellersBuyersRemote(product);
+        cacheAllBuyerSellerInfo(sellers, product.getUserContact());
 
-        ScreenPagination screenPages = setSellerDistrictNavigation(product);
+        ScreenPagination screenPages = setSellerBuyerDistrictNavigation(product);
 
         UssdMenuComponents menuComponents
                 = breakIntoPages(requestInput, responseMenu,
@@ -1896,12 +2296,146 @@ public class JsonProcessor implements HttpUnitController {
         return menuComponents;
     }
 
-    UssdMenuComponents displayCategories(String requestInput, String sessionId,
-            Map<String, String> menuNodes, AgProduct product, ItemTag tag)
+    UssdMenuComponents displayFarmingTips(
+            String requestInput, String sessionId,
+            Map<String, String> menuNodes, AgProduct product,
+            ItemTag tag, boolean isRegistered)
             throws MyCustomException {
 
-        MenuName responseMenu = MenuName.ITEM_CATEGORIES;
+        UssdMenuComponents menuComponents;
 
+        MenuName responseMenu = MenuName.FARMING_TIPS_CATEGORY;
+        product.setTag(tag);
+        internalDbAccess.saveOrUpdateEntity(product);
+
+        GetFarmingTipsResponse tips = getFarmingTipsRemote(product);
+        cacheAllFarmingTipsInfo(tips, product.getUserContact());
+
+        ScreenPagination screenPages = setFarmTipsCategoryNavigation(product);
+
+        menuComponents = breakIntoPages(requestInput, responseMenu,
+                menuNodes, sessionId, screenPages,
+                new TitleAddition(true, product.getFarmingTipsCategory()
+                        .getValue()));
+
+        return menuComponents;
+    }
+
+    UssdMenuComponents displayFarmingTopics(String requestInput,
+            String msisdn, Map<String, String> menuNodes,
+            String newSessionID) throws MyCustomException {
+
+        MenuName responseMenu = MenuName.FARMING_TIPS_TOPICS;
+
+        AgNavigation navigation = HibernateUtils
+                .getNavigationByMsisdn(internalDbAccess, msisdn);
+
+        MenuHistory menuHistory
+                = getMenuHistoryHelper(navigation.getMenuHistory());
+        MenuHistory.Data menuData = getCurrentMenuData(menuHistory);
+
+        DataItem data = getDataValue(menuData, requestInput);
+        String menuTitle = data.getDataValue();
+        String dataId = data.getDataId();
+
+        AgProduct product = fetchProduct(msisdn);
+        product.setFarmingTipCategoryId(Integer.valueOf(dataId));
+        internalDbAccess.saveOrUpdateEntity(product);
+
+        ScreenPagination paged = setFarmingTopicsNavigation(product);
+
+        UssdMenuComponents menuComponents
+                = breakIntoPages(requestInput, responseMenu, menuNodes,
+                        newSessionID, paged, new TitleAddition(true, menuTitle));
+
+        return menuComponents;
+    }
+
+    UssdMenuComponents displayFarmingChapters(String requestInput,
+            String msisdn, Map<String, String> menuNodes,
+            String newSessionID) throws MyCustomException {
+
+        MenuName responseMenu = MenuName.FARMING_TIPS_CHAPTERS;
+
+        AgNavigation navigation = HibernateUtils
+                .getNavigationByMsisdn(internalDbAccess, msisdn);
+
+        MenuHistory menuHistory
+                = getMenuHistoryHelper(navigation.getMenuHistory());
+        MenuHistory.Data menuData = getCurrentMenuData(menuHistory);
+
+        DataItem data = getDataValue(menuData, requestInput);
+        String menuTitle = data.getDataValue();
+        String dataId = data.getDataId();
+
+        AgProduct product = fetchProduct(msisdn);
+        product.setFarmingTipTopicId(Integer.valueOf(dataId));
+        internalDbAccess.saveOrUpdateEntity(product);
+
+        ScreenPagination paged = setFarmingChaptersNavigation(product);
+
+        UssdMenuComponents menuComponents
+                = breakIntoPages(requestInput, responseMenu, menuNodes,
+                        newSessionID, paged, new TitleAddition(true, menuTitle));
+
+        return menuComponents;
+    }
+
+    UssdMenuComponents displayFarmingTipContent(String requestInput,
+            String msisdn, Map<String, String> menuNodes,
+            String newSessionID) throws MyCustomException {
+
+        MenuName responseMenu = MenuName.FARMING_TIPS_CONTENT;
+
+        AgNavigation navigation = HibernateUtils
+                .getNavigationByMsisdn(internalDbAccess, msisdn);
+
+        MenuHistory menuHistory
+                = getMenuHistoryHelper(navigation.getMenuHistory());
+        MenuHistory.Data menuData = getCurrentMenuData(menuHistory);
+
+        DataItem data = getDataValue(menuData, requestInput);
+        String dataId = data.getDataId();
+
+        AgProduct product = fetchProduct(msisdn);
+        product.setFarmingTipChapterId(Integer.valueOf(dataId));
+        internalDbAccess.saveOrUpdateEntity(product);
+
+        GetFarmingTipsResponse categories
+                = getFarmingTipsCategoriesCached(navigation);
+        GetFarmingTipsResponse.Chapter tipChapter = getFarmingTipContent(categories, product);
+
+        String menuTitle = data.getDataValue() + "\n\n"
+                + tipChapter.getContent();
+
+        UssdMenuComponents menuComponents
+                = getUssdMenuComponentsHelper(responseMenu, menuNodes,
+                        new TitleAddition(false, menuTitle));
+        menuComponents.setNavBar(NavigationBar.PREVIOUS_AND_MAIN);
+        //menuComponents.setIsIsEnd(true);
+
+        return menuComponents;
+    }
+
+    UssdMenuComponents displayCategories(String requestInput, String sessionId,
+            Map<String, String> menuNodes, AgProduct product, ItemTag tag,
+            boolean isRegistered) throws MyCustomException {
+
+        UssdMenuComponents menuComponents;
+
+        //Must be registered to find buyers
+        if (!isRegistered
+                && (product.getUssdFunction() == UssdFunction.FIND_BUYERS
+                || product.getUssdFunction() == UssdFunction.SELL
+                || product.getUssdFunction() == UssdFunction.MATCHED_BUYERS)) {
+
+            menuComponents = getUssdMenuComponentsHelper(MenuName.REGISTER_NAME,
+                    menuNodes);
+            menuComponents.setNavBar(NavigationBar.PREVIOUS_AND_MAIN);
+            return menuComponents;
+        }
+
+        MenuName responseMenu = MenuName.ITEM_CATEGORIES;
         product.setTag(tag);
         internalDbAccess.saveOrUpdateEntity(product);
 
@@ -1910,10 +2444,9 @@ public class JsonProcessor implements HttpUnitController {
 
         ScreenPagination screenPages = setCategoryNavigation(product);
 
-        UssdMenuComponents menuComponents
-                = breakIntoPages(requestInput, responseMenu,
-                        menuNodes, sessionId, screenPages,
-                        new TitleAddition(false, product.getItemName()));
+        menuComponents = breakIntoPages(requestInput, responseMenu,
+                menuNodes, sessionId, screenPages,
+                new TitleAddition(false, product.getItemName()));
 
         return menuComponents;
     }
@@ -1924,7 +2457,8 @@ public class JsonProcessor implements HttpUnitController {
 
         MenuName responseMenu = MenuName.ITEM_SUBCATEGORIES;
 
-        AgNavigation navigation = getNavigationByMsisdn(msisdn);
+        AgNavigation navigation = HibernateUtils
+                .getNavigationByMsisdn(internalDbAccess, msisdn);
 
         MenuHistory menuHistory
                 = getMenuHistoryHelper(navigation.getMenuHistory());
@@ -1947,25 +2481,23 @@ public class JsonProcessor implements HttpUnitController {
         return menuComponents;
     }
 
-    UssdMenuComponents displayMatchedBuyers(String requestInput, String sessionId,
-            Map<String, String> menuNodes, AgProduct product, ItemTag tag)
-            throws MyCustomException {
+    UssdMenuComponents displayMenuAfterSubCategories(String requestInput,
+            String msisdn, Map<String, String> menuNodes,
+            String newSessionID) throws MyCustomException {
 
-        MenuName responseMenu = MenuName.MATCHED_PRODUCTS;
+        AgProduct product = fetchProduct(msisdn);
 
-        product.setTag(tag);
-        product.setIsMatched(Boolean.TRUE);
-        internalDbAccess.saveOrUpdateEntity(product);
+        UssdFunction function = product.getUssdFunction();
+        UssdMenuComponents menuComponents;
 
-        GetBuyerResponse categories = getBuyersRemote(product);
-        cacheAllBuyersInfo(categories, product.getUserContact());
-
-        ScreenPagination screenPages = setMatchedProductsNavigation(product);
-
-        UssdMenuComponents menuComponents
-                = breakIntoPages(requestInput, responseMenu,
-                        menuNodes, sessionId, screenPages, null);
-
+        if (function == UssdFunction.MATCHED_BUYERS
+                || function == UssdFunction.FIND_BUYERS) {
+            menuComponents = displayItemLocation(requestInput, msisdn,
+                    menuNodes, newSessionID);
+        } else {
+            menuComponents = displayRegions(requestInput, msisdn,
+                    menuNodes, newSessionID);
+        }
         return menuComponents;
     }
 
@@ -1975,7 +2507,8 @@ public class JsonProcessor implements HttpUnitController {
 
         MenuName responseMenu = MenuName.REGION;
 
-        AgNavigation navigation = getNavigationByMsisdn(msisdn);
+        AgNavigation navigation = HibernateUtils
+                .getNavigationByMsisdn(internalDbAccess, msisdn);
 
         MenuHistory menuHistory
                 = getMenuHistoryHelper(navigation.getMenuHistory());
@@ -1999,44 +2532,104 @@ public class JsonProcessor implements HttpUnitController {
         return menuComponents;
     }
 
-    UssdMenuComponents displayMatchedBuyerLocation(String requestInput,
-            String msisdn, Map<String, String> menuNodes,
-            String newSessionID) throws MyCustomException {
+    UssdMenuComponents displayItemLocation(String requestInput, String msisdn,
+            Map<String, String> menuNodes, String newSessionID)
+            throws MyCustomException {
 
-        MenuName responseMenu = MenuName.BUYER_LOCATION;
+        MenuName responseMenu = MenuName.ITEM_LOCATION;
 
-        AgNavigation navigation = getNavigationByMsisdn(msisdn);
+        AgNavigation navigation = HibernateUtils
+                .getNavigationByMsisdn(internalDbAccess, msisdn);
 
         MenuHistory menuHistory
                 = getMenuHistoryHelper(navigation.getMenuHistory());
         MenuHistory.Data menuData = getCurrentMenuData(menuHistory);
-        menuData.getMenuName();
 
-        DataItem data = getDataValue(menuData, requestInput);
-        String itemName = data.getDataValue();
-        String dataId = data.getDataId();
+        DataItem dataItem = getDataValue(menuData, requestInput);
+        String itemName = dataItem.getDataValue();
+        String itemId = dataItem.getDataId();
 
         AgProduct product = fetchProduct(msisdn);
-        product.setSubCategoryId(Integer.valueOf(dataId));
+        product.setSubCategoryId(Integer.valueOf(itemId));
         product.setItemName(itemName);
         internalDbAccess.saveOrUpdateEntity(product);
 
+        GetBuyerSellerResponse buyerSellers = getSellersBuyersRemote(product);
+        cacheAllBuyerSellerInfo(buyerSellers, product.getUserContact());
+
+        AgUssdMenu menu = retrieveMenuFromDB(responseMenu);
+
+        Set<AgMenuItemIndex> menuItems
+                = getItemLocationMenuItems(product, menu, menuNodes);
+
         UssdMenuComponents menuComponents
-                = getUssdMenuComponentsHelper(responseMenu, menuNodes,
-                        new TitleAddition(false, itemName));
+                = getUssdMenuComponentsHelper(menu, menuNodes,
+                        new TitleAddition(false, itemName), menuItems);
+
         menuComponents.setNavBar(NavigationBar.PREVIOUS_AND_MAIN);
 
         return menuComponents;
     }
 
-    boolean cacheAllSellersInfo(GetSellersResponse sellers, String clientMsisdn)
+//    UssdMenuComponents displayItemLocation(String requestInput,
+//            String msisdn, Map<String, String> menuNodes,
+//            String newSessionID) throws MyCustomException {
+//
+//        MenuName responseMenu = MenuName.ITEM_LOCATION;
+//
+//        AgNavigation navigation = getNavigationByMsisdn(msisdn);
+//
+//        MenuHistory menuHistory
+//                = getMenuHistoryHelper(navigation.getMenuHistory());
+//        MenuHistory.Data menuData = getCurrentMenuData(menuHistory);
+//        menuData.getMenuName();
+//
+//        DataItem data = getDataValue(menuData, requestInput);
+//        String itemName = data.getDataValue();
+//        String dataId = data.getDataId();
+//
+//        AgProduct product = fetchProduct(msisdn);
+//        product.setSubCategoryId(Integer.valueOf(dataId));
+//        product.setItemName(itemName);
+//        internalDbAccess.saveOrUpdateEntity(product);
+//
+//        UssdMenuComponents menuComponents
+//                = getUssdMenuComponentsHelper(responseMenu, menuNodes,
+//                        new TitleAddition(false, itemName));
+//        menuComponents.setNavBar(NavigationBar.PREVIOUS_AND_MAIN);
+//
+//        return menuComponents;
+//    }
+//    UssdMenuComponents displayMatchedBuyers(String requestInput, String sessionId,
+//            Map<String, String> menuNodes, AgProduct product, ItemTag tag)
+//            throws MyCustomException {
+//
+//        MenuName responseMenu = MenuName.MATCHED_PRODUCTS;
+//
+//        product.setTag(tag);
+//        product.setIsMatched(Boolean.TRUE);
+//        internalDbAccess.saveOrUpdateEntity(product);
+//
+//        GetBuyerResponse categories = getBuyersRemote(product);
+//        cacheAllBuyersInfo(categories, product.getUserContact());
+//
+//        ScreenPagination screenPages = setMatchedProductsNavigation(product);
+//
+//        UssdMenuComponents menuComponents
+//                = breakIntoPages(requestInput, responseMenu,
+//                        menuNodes, sessionId, screenPages, null);
+//
+//        return menuComponents;
+//    }
+    boolean cacheAllBuyerSellerInfo(GetBuyerSellerResponse sellers, String clientMsisdn)
             throws MyCustomException {
 
         String allData = GeneralUtils.convertToJson(sellers,
-                GetSellersResponse.class);
+                GetBuyerSellerResponse.class);
 
-        AgNavigation navigation = getNavigationByMsisdn(clientMsisdn);
-        navigation.setAllSellersInfo(allData);
+        AgNavigation navigation = HibernateUtils
+                .getNavigationByMsisdn(internalDbAccess, clientMsisdn);
+        navigation.setAllBuyerSellerInfo(allData);
         internalDbAccess.saveOrUpdateEntity(navigation);
 
         return true;
@@ -2048,8 +2641,23 @@ public class JsonProcessor implements HttpUnitController {
         String allData = GeneralUtils.convertToJson(markets,
                 MarketPriceResponse.class);
 
-        AgNavigation navigation = getNavigationByMsisdn(clientMsisdn);
+        AgNavigation navigation = HibernateUtils
+                .getNavigationByMsisdn(internalDbAccess, clientMsisdn);
         navigation.setAllMarketInfo(allData);
+        internalDbAccess.saveOrUpdateEntity(navigation);
+
+        return true;
+    }
+
+    boolean cacheAllDistrictInfo(GetDistrictResponse districts, String clientMsisdn)
+            throws MyCustomException {
+
+        String allData = GeneralUtils.convertToJson(districts,
+                GetDistrictResponse.class);
+
+        AgNavigation navigation = HibernateUtils
+                .getNavigationByMsisdn(internalDbAccess, clientMsisdn);
+        navigation.setAllDistrictInfo(allData);
         internalDbAccess.saveOrUpdateEntity(navigation);
 
         return true;
@@ -2061,8 +2669,23 @@ public class JsonProcessor implements HttpUnitController {
         String allData = GeneralUtils.convertToJson(categories,
                 GetCategoryResponse.class);
 
-        AgNavigation navigation = getNavigationByMsisdn(clientMsisdn);
+        AgNavigation navigation = HibernateUtils
+                .getNavigationByMsisdn(internalDbAccess, clientMsisdn);
         navigation.setAllCategoriesData(allData);
+        internalDbAccess.saveOrUpdateEntity(navigation);
+
+        return true;
+    }
+
+    boolean cacheAllFarmingTipsInfo(GetFarmingTipsResponse categories,
+            String clientMsisdn) throws MyCustomException {
+
+        String allData = GeneralUtils.convertToJson(categories,
+                GetFarmingTipsResponse.class);
+
+        AgNavigation navigation = HibernateUtils
+                .getNavigationByMsisdn(internalDbAccess, clientMsisdn);
+        navigation.setAllFarmingTips(allData);
         internalDbAccess.saveOrUpdateEntity(navigation);
 
         return true;
@@ -2074,7 +2697,8 @@ public class JsonProcessor implements HttpUnitController {
         String allData = GeneralUtils.convertToJson(buyers,
                 GetBuyerResponse.class);
 
-        AgNavigation navigation = getNavigationByMsisdn(clientMsisdn);
+        AgNavigation navigation = HibernateUtils
+                .getNavigationByMsisdn(internalDbAccess, clientMsisdn);
         navigation.setAllBuyersInfo(allData);
         internalDbAccess.saveOrUpdateEntity(navigation);
 
@@ -2085,14 +2709,15 @@ public class JsonProcessor implements HttpUnitController {
             throws MyCustomException {
 
         AgNavigation navigation
-                = getNavigationByMsisdn(product.getUserContact());
+                = HibernateUtils
+                .getNavigationByMsisdn(internalDbAccess, product.getUserContact());
 
         GetBuyerResponse categories = getBuyersCached(navigation);
 
         Set<? extends MenuItem> menuItemList = getMatchedProducts(categories);
 
         ScreenPagination screenPages = paginateData(menuItemList,
-                DEFAULT_ITEMS_PER_SCREEN);
+                DEFAULT_ITEMS_PER_SCREEN, product);
         String pages = GeneralUtils.convertToJson(screenPages,
                 ScreenPagination.class);
 
@@ -2102,18 +2727,42 @@ public class JsonProcessor implements HttpUnitController {
         return screenPages;
     }
 
+    ScreenPagination setFarmTipsCategoryNavigation(AgProduct product)
+            throws MyCustomException {
+
+        AgNavigation navigation = HibernateUtils
+                .getNavigationByMsisdn(internalDbAccess, product.getUserContact());
+
+        GetFarmingTipsResponse categories
+                = getFarmingTipsCategoriesCached(navigation);
+
+        Set<? extends MenuItem> menuItemList
+                = getFarmingTipsCategories(categories);
+
+        ScreenPagination screenPages = paginateData(menuItemList,
+                SIX_ITEMS_PER_SCREEN, product);
+        String pages = GeneralUtils.convertToJson(screenPages,
+                ScreenPagination.class);
+
+        navigation.setFarmingTipsNav(pages);
+        internalDbAccess.saveOrUpdateEntity(navigation);
+
+        return screenPages;
+    }
+
     ScreenPagination setCategoryNavigation(AgProduct product)
             throws MyCustomException {
 
-        AgNavigation navigation
-                = getNavigationByMsisdn(product.getUserContact());
+        AgNavigation navigation = HibernateUtils
+                .getNavigationByMsisdn(internalDbAccess, product.getUserContact());
 
         GetCategoryResponse categories = getCategoriesCached(navigation);
 
-        Set<? extends MenuItem> menuItemList = getCategories(categories);
+        Set<? extends MenuItem> menuItemList
+                = getCategories(categories, product.getTag());
 
         ScreenPagination screenPages = paginateData(menuItemList,
-                DEFAULT_ITEMS_PER_SCREEN);
+                DEFAULT_ITEMS_PER_SCREEN, product);
         String pages = GeneralUtils.convertToJson(screenPages,
                 ScreenPagination.class);
 
@@ -2127,19 +2776,71 @@ public class JsonProcessor implements HttpUnitController {
             throws MyCustomException {
 
         AgNavigation navigation
-                = getNavigationByMsisdn(product.getUserContact());
+                = HibernateUtils
+                .getNavigationByMsisdn(internalDbAccess, product.getUserContact());
 
         GetCategoryResponse categories = getCategoriesCached(navigation);
 
         Set<? extends MenuItem> menuItemList = getSubCategories(categories,
-                product.getCategoryId());
+                product.getTag(), product.getCategoryId());
 
         ScreenPagination screenPages = paginateData(menuItemList,
-                DEFAULT_ITEMS_PER_SCREEN);
+                DEFAULT_ITEMS_PER_SCREEN, product);
+
         String pages = GeneralUtils.convertToJson(screenPages,
                 ScreenPagination.class);
 
+        product.setIsConsiderCount(false);
+        internalDbAccess.saveOrUpdateEntity(product);
+
         navigation.setSubCategoryNav(pages);
+        internalDbAccess.saveOrUpdateEntity(navigation);
+
+        return screenPages;
+    }
+
+    ScreenPagination setFarmingTopicsNavigation(AgProduct product)
+            throws MyCustomException {
+
+        AgNavigation navigation = HibernateUtils
+                .getNavigationByMsisdn(internalDbAccess, product.getUserContact());
+
+        GetFarmingTipsResponse categories
+                = getFarmingTipsCategoriesCached(navigation);
+
+        Set<? extends MenuItem> menuItemList = getFarmingTopics(categories,
+                product.getFarmingTipCategoryId());
+
+        ScreenPagination screenPages = paginateData(menuItemList,
+                FOUR_ITEMS_PER_SCREEN, product);
+        String pages = GeneralUtils.convertToJson(screenPages,
+                ScreenPagination.class);
+
+        navigation.setFarmingTopicsNav(pages);
+        internalDbAccess.saveOrUpdateEntity(navigation);
+
+        return screenPages;
+    }
+
+    ScreenPagination setFarmingChaptersNavigation(AgProduct product)
+            throws MyCustomException {
+
+        AgNavigation navigation
+                = HibernateUtils
+                .getNavigationByMsisdn(internalDbAccess, product.getUserContact());
+
+        GetFarmingTipsResponse categories
+                = getFarmingTipsCategoriesCached(navigation);
+
+        Set<? extends MenuItem> menuItemList = getFarmingChapters(categories,
+                product);
+
+        ScreenPagination screenPages = paginateData(menuItemList,
+                FOUR_ITEMS_PER_SCREEN, product);
+        String pages = GeneralUtils.convertToJson(screenPages,
+                ScreenPagination.class);
+
+        navigation.setFarmingChaptersNav(pages);
         internalDbAccess.saveOrUpdateEntity(navigation);
 
         return screenPages;
@@ -2149,14 +2850,16 @@ public class JsonProcessor implements HttpUnitController {
             throws MyCustomException {
 
         AgNavigation navigation
-                = getNavigationByMsisdn(product.getUserContact());
+                = HibernateUtils
+                .getNavigationByMsisdn(internalDbAccess, product.getUserContact());
 
         MarketPriceResponse markets = getMarketPricesCached(navigation);
 
         Set<? extends MenuItem> menuItemList
                 = listMarketPrices(markets.getData());
 
-        ScreenPagination screenPages = paginateData(menuItemList, 6);
+        ScreenPagination screenPages = paginateData(menuItemList,
+                THREE_ITEMS_PER_SCREEN, product);
         String pages = GeneralUtils.convertToJson(screenPages,
                 ScreenPagination.class);
 
@@ -2166,23 +2869,47 @@ public class JsonProcessor implements HttpUnitController {
         return screenPages;
     }
 
-    ScreenPagination setSellerDistrictNavigation(AgProduct product)
+    ScreenPagination setDistrictsNavigation(AgProduct product)
             throws MyCustomException {
 
         AgNavigation navigation
-                = getNavigationByMsisdn(product.getUserContact());
+                = HibernateUtils
+                .getNavigationByMsisdn(internalDbAccess, product.getUserContact());
 
-        GetSellersResponse markets = getSellersCached(navigation);
+        GetDistrictResponse response = getDistrictsCached(navigation);
+
+        Set<? extends MenuItem> menuItemList = response.getData();
+
+        ScreenPagination screenPages = paginateData(menuItemList,
+                SIX_ITEMS_PER_SCREEN, product);
+
+        String pages = GeneralUtils.convertToJson(screenPages,
+                ScreenPagination.class);
+
+        navigation.setDistrictsNav(pages);
+        internalDbAccess.saveOrUpdateEntity(navigation);
+
+        return screenPages;
+    }
+
+    ScreenPagination setSellerBuyerDistrictNavigation(AgProduct product)
+            throws MyCustomException {
+
+        AgNavigation navigation
+                = HibernateUtils
+                .getNavigationByMsisdn(internalDbAccess, product.getUserContact());
+
+        GetBuyerSellerResponse markets = getBuyerSellersCached(navigation);
 
         Set<? extends MenuItem> menuItemList
                 = filterSellersByDistrict(markets.getData(), 0);// get all
 
         ScreenPagination screenPages = paginateData(menuItemList,
-                DEFAULT_ITEMS_PER_SCREEN);
+                THREE_ITEMS_PER_SCREEN, product);
         String pages = GeneralUtils.convertToJson(screenPages,
                 ScreenPagination.class);
 
-        navigation.setDistrictSellersNav(pages);
+        navigation.setDistrictBuyerSellerNav(pages);
         internalDbAccess.saveOrUpdateEntity(navigation);
 
         return screenPages;
@@ -2192,7 +2919,8 @@ public class JsonProcessor implements HttpUnitController {
             throws MyCustomException {
 
         AgNavigation navigation
-                = getNavigationByMsisdn(product.getUserContact());
+                = HibernateUtils
+                .getNavigationByMsisdn(internalDbAccess, product.getUserContact());
 
         MarketPriceResponse2 markets = getMarketPrices2Cached(navigation);
 
@@ -2200,7 +2928,7 @@ public class JsonProcessor implements HttpUnitController {
                 = filterMarketsByDistrictAndProduct(markets.getData(), product);
 
         ScreenPagination screenPages = paginateData(districtMarkets,
-                DEFAULT_ITEMS_PER_SCREEN);
+                DEFAULT_ITEMS_PER_SCREEN, product);
         String pages = GeneralUtils.convertToJson(screenPages,
                 ScreenPagination.class);
 
@@ -2214,7 +2942,8 @@ public class JsonProcessor implements HttpUnitController {
             throws MyCustomException {
 
         AgNavigation navigation
-                = getNavigationByMsisdn(product.getUserContact());
+                = HibernateUtils
+                .getNavigationByMsisdn(internalDbAccess, product.getUserContact());
 
         MarketPriceResponse2 markets = getMarketPrices2Cached(navigation);
 
@@ -2222,7 +2951,7 @@ public class JsonProcessor implements HttpUnitController {
                 = filterMarketPrices(markets.getData(), product);
 
         ScreenPagination screenPages = paginateData(marketPrices,
-                DEFAULT_ITEMS_PER_SCREEN);
+                DEFAULT_ITEMS_PER_SCREEN, product);
         String pages = GeneralUtils.convertToJson(screenPages,
                 ScreenPagination.class);
 
@@ -2232,51 +2961,58 @@ public class JsonProcessor implements HttpUnitController {
         return screenPages;
     }
 
-    ScreenPagination setSellersNavigation(AgProduct product)
+    ScreenPagination setBuyerSellersNavigation(AgProduct product)
             throws MyCustomException {
 
-        AgNavigation navigation
-                = getNavigationByMsisdn(product.getUserContact());
+        AgNavigation navigation = HibernateUtils
+                .getNavigationByMsisdn(internalDbAccess,
+                        product.getUserContact());
 
-        GetSellersResponse sellers = getSellersCached(navigation);
+        GetBuyerSellerResponse buyerSellers = getBuyerSellersCached(navigation);
 
-        Set<? extends MenuItem> sellerList
-                = filterSellersList(sellers.getData(), product);
+        Set<? extends MenuItem> list;
 
-        ScreenPagination screenPages = paginateData(sellerList, 5);
+        if (product.getUssdFunction() == UssdFunction.MATCHED_BUYERS
+                || product.getUssdFunction() == UssdFunction.FIND_BUYERS) {
+            list = filterBuyerSellersByLocation(buyerSellers.getData(), product);
+        } else {
+            list = filterBuyerSellersByDistrict(buyerSellers.getData(), product);
+        }
+
+        ScreenPagination screenPages = paginateData(list,
+                THREE_ITEMS_PER_SCREEN, product);
         String pages = GeneralUtils.convertToJson(screenPages,
                 ScreenPagination.class);
 
-        navigation.setSellersNav(pages);
+        navigation.setBuyerSellerNav(pages);
         internalDbAccess.saveOrUpdateEntity(navigation);
 
         return screenPages;
     }
 
-    ScreenPagination setBuyerNavigation(AgProduct product)
-            throws MyCustomException {
-
-        AgNavigation navigation
-                = getNavigationByMsisdn(product.getUserContact());
-
-        GetBuyerResponse buyers = getBuyersCached(navigation);
-
-        Set<? extends MenuItem> buyerList
-                = filterBuyersList(buyers, product);
-
-        logger.debug("Called BuyerList size: " + buyerList.size());
-
-        ScreenPagination screenPages = paginateData(buyerList,
-                DEFAULT_ITEMS_PER_SCREEN);
-        String pages = GeneralUtils.convertToJson(screenPages,
-                ScreenPagination.class);
-
-        navigation.setMatchedBuyersNav(pages);
-        internalDbAccess.saveOrUpdateEntity(navigation);
-
-        return screenPages;
-    }
-
+//    ScreenPagination setBuyerNavigation(AgProduct product)
+//            throws MyCustomException {
+//
+//        AgNavigation navigation
+//                = getNavigationByMsisdn(product.getUserContact());
+//
+//        GetBuyerResponse buyers = getBuyersCached(navigation);
+//
+//        Set<? extends MenuItem> buyerList
+//                = filterBuyersList(buyers, product);
+//
+//        logger.debug("Called BuyerList size: " + buyerList.size());
+//
+//        ScreenPagination screenPages = paginateData(buyerList,
+//                DEFAULT_ITEMS_PER_SCREEN);
+//        String pages = GeneralUtils.convertToJson(screenPages,
+//                ScreenPagination.class);
+//
+//        navigation.setMatchedBuyersNav(pages);
+//        internalDbAccess.saveOrUpdateEntity(navigation);
+//
+//        return screenPages;
+//    }
     UssdMenuComponents breakIntoPages(String requestInput,
             MenuName responseMenu, Map<String, String> menuNodes,
             String newSessionID, ScreenPagination pages,
@@ -2314,8 +3050,15 @@ public class JsonProcessor implements HttpUnitController {
             ItemTag tag, UssdFunction function)
             throws MyCustomException {
 
+        boolean isMatched = Boolean.FALSE;
+        Region region = Region.ALL;
+
+        if (function == UssdFunction.MATCHED_BUYERS) {
+            isMatched = Boolean.TRUE;
+        }
+
         AgProduct product = new AgProduct();
-        product.setBuyerId(0);
+        product.setBuyerId("0");
         product.setBuyerName("");
         product.setBuyerPrice(0);
         product.setCategoryId(0);
@@ -2325,18 +3068,19 @@ public class JsonProcessor implements HttpUnitController {
         product.setDistrictName("");
         product.setPlace("");
         product.setItemName("");
-        product.setPaymentMethod("");
+        product.setPaymentMethod(-1);
         product.setQuantity("");
         product.setSellerPrice(0);
-        product.setTransportArea(TransportArea.UNKNOWN);
-        product.setRegion(Region.UNKNOWN);
+        product.setTransportArea(TransportArea.NONE);
+        product.setRegion(region);
         product.setUserContact(clientMsisdn);
         product.setIsSubmitted(Boolean.FALSE);
+        product.setIsConsiderCount(Boolean.TRUE);
         product.setSessionId(newSessionID);
         product.setTag(tag);
         product.setUssdFunction(function);
-        product.setIsMatched(Boolean.FALSE);
-        product.setBuyerLocation(BuyerLocation.UNKNOWN);
+        product.setIsMatched(isMatched);
+        product.setItemLocation(ItemLocation.UNKNOWN);
 
         internalDbAccess.saveOrUpdateEntity(product);
 
@@ -2376,6 +3120,78 @@ public class JsonProcessor implements HttpUnitController {
         }
 
         return new DynamicMenuItem(menuItems, menuOptions);
+    }
+
+    Set<AgMenuItemIndex> getItemLocationMenuItems(AgProduct product,
+            AgUssdMenu menu, Map<String, String> menuNodes)
+            throws MyCustomException {
+
+        AgNavigation navigation
+                = HibernateUtils
+                .getNavigationByMsisdn(internalDbAccess, product.getUserContact());
+
+        GetBuyerSellerResponse buyers = getBuyerSellersCached(navigation);
+
+        Map<ItemLocation, Integer> items = new HashMap<>();
+
+        Set<AgMenuItemIndex> menuItems = menu.getMenuItems();
+        Set<AgMenuItemIndex> newItems = new HashSet<>();
+
+        for (GetBuyerSellerResponse.Data.SellerDistrict district
+                : buyers.getData().getDistricts()) {
+
+            ItemLocation itemLocation
+                    = ItemLocation.convertToEnum(district.getItemLocation());
+
+            System.out.println("District loc: " + district.getItemLocation());
+
+            int count = items.getOrDefault(itemLocation, 0);
+
+            count += district.getContacts().size();
+
+            items.put(itemLocation, count);
+        }
+
+        for (AgMenuItemIndex item : menuItems) {
+
+            ItemLocation itemLoc;
+            String itemCode = item.getMenuItemCode();
+
+            switch (itemCode) {
+
+                case "1131":
+                    itemLoc = ItemLocation.NEARBY;
+                    break;
+
+                case "1132":
+                    itemLoc = ItemLocation.NATIONAL;
+                    break;
+
+                case "1133":
+                    itemLoc = ItemLocation.INTERNATIONAL;
+                    break;
+
+                default:
+                    itemLoc = ItemLocation.UNKNOWN;
+                    break;
+            }
+
+            int count = items.getOrDefault(itemLoc, 0);
+
+            //if (count > 0) { //only item locations with buyers
+            System.out.println("Count here: " + count + ", itemLoc: " + itemLoc);
+
+            String itemValue = convertMenuNodeToString(itemCode, menuNodes);
+            int index = item.getMenuItemIndex();
+
+            AgMenuItemIndex menuItem
+                    = new AgMenuItemIndex(itemValue + "(" + count + ")", index);
+            menuItem.setId(index);
+            newItems.add(menuItem);
+            //}
+        }
+
+        return newItems;
     }
 
     UssdMenuComponents getUssdMenuComponentsHelper(
@@ -2422,6 +3238,52 @@ public class JsonProcessor implements HttpUnitController {
 
     UssdMenuComponents getUssdMenuComponentsHelper(
             MenuName responseMenu, Map<String, String> menuNodes,
+            TitleAddition titleAddition, Set<AgMenuItemIndex> menuItems)
+            throws MyCustomException {
+
+        AgUssdMenu menu = retrieveMenuFromDB(responseMenu);
+
+        String menuTitle = convertMenuNodeToString(menu.getMenuTitleText(), menuNodes);
+        if (titleAddition.isIsPrefix()) {
+            menuTitle = titleAddition.getAddition() + "\n"
+                    + menuTitle;
+        } else {
+            menuTitle = menuTitle + "\n" + titleAddition.getAddition();
+        }
+
+        UssdMenuComponents menuComponents = new UssdMenuComponents();
+        menuComponents.setMenuItems(menuItems);
+        menuComponents.setResponseMenu(responseMenu);
+        menuComponents.setMenuTitle(menuTitle);
+        menuComponents.setNavBar(NavigationBar.NONE);
+
+        return menuComponents;
+    }
+
+    UssdMenuComponents getUssdMenuComponentsHelper(
+            AgUssdMenu menu, Map<String, String> menuNodes,
+            TitleAddition titleAddition, Set<AgMenuItemIndex> menuItems)
+            throws MyCustomException {
+
+        String menuTitle = convertMenuNodeToString(menu.getMenuTitleText(), menuNodes);
+        if (titleAddition.isIsPrefix()) {
+            menuTitle = titleAddition.getAddition() + "\n"
+                    + menuTitle;
+        } else {
+            menuTitle = menuTitle + "\n" + titleAddition.getAddition();
+        }
+
+        UssdMenuComponents menuComponents = new UssdMenuComponents();
+        menuComponents.setMenuItems(menuItems);
+        menuComponents.setResponseMenu(menu.getMenuName());
+        menuComponents.setMenuTitle(menuTitle);
+        menuComponents.setNavBar(NavigationBar.NONE);
+
+        return menuComponents;
+    }
+
+    UssdMenuComponents getUssdMenuComponentsHelper(
+            MenuName responseMenu, Map<String, String> menuNodes,
             List<MenuHistory.MenuOption> menuOptions, int screenNum,
             int totalScreens, TitleAddition titleAddition, String menuTitle,
             Set<AgMenuItemIndex> menuItems) throws MyCustomException {
@@ -2455,19 +3317,19 @@ public class JsonProcessor implements HttpUnitController {
             String newSessionID) throws MyCustomException {
 
         MenuName responseMenu = MenuName.TRANSPORT;
-        String payMethod;
+        int payMethod;
         switch (requestInput) {
 
             case "1":
-                payMethod = "CASH";
+                payMethod = 8;
                 break;
 
             case "2":
-                payMethod = "MOMO";
+                payMethod = 1;
                 break;
 
             default:
-                payMethod = "CASH";
+                payMethod = 8;
                 break;
         }
 
@@ -2511,12 +3373,12 @@ public class JsonProcessor implements HttpUnitController {
         productSale.setTransportArea(transport);
         internalDbAccess.saveOrUpdateEntity(productSale);
 
-        String titleAdd = "Item : " + productSale.getItemName() + "\n"
+        String titleAdd = "\nItem : " + productSale.getItemName() + "\n"
                 + "Qnty : " + productSale.getQuantity() + "Kgs" + "\n"
                 + "Price: " + productSale.getSellerPrice() + "/Kg" + "\n"
-                + "place: " + productSale.getPlace() + "\n"
-                + "District: " + productSale.getDistrictName() + "\n"
-                + "Region: " + productSale.getRegion() + "\n";
+                //+ "place: " + productSale.getPlace() + "\n"
+                + "District: " + productSale.getDistrictName() + "\n";
+        //+ "Region: " + productSale.getRegion() + "\n";
 
         UssdMenuComponents menuComponents
                 = getUssdMenuComponentsHelper(responseMenu, menuNodes,
@@ -2531,7 +3393,8 @@ public class JsonProcessor implements HttpUnitController {
 
         MenuName responseMenu = MenuName.CONFIRM;
 
-        AgNavigation navigation = getNavigationByMsisdn(msisdn);
+        AgNavigation navigation = HibernateUtils
+                .getNavigationByMsisdn(internalDbAccess, msisdn);
 
         MenuHistory menuHistory
                 = getMenuHistoryHelper(navigation.getMenuHistory());
@@ -2541,17 +3404,19 @@ public class JsonProcessor implements HttpUnitController {
         DataItem data = getDataValue(menuData, requestInput);
         String itemName = data.getDataValue();
         String dataId = data.getDataId();
+        String ids[] = dataId.split("-");
 
         AgProduct product = fetchProduct(msisdn);
-        product.setSellerId(Integer.valueOf(dataId));
+        product.setSellerId(ids[0]);
         product.setSellerName(itemName);
 
-        GetSellersResponse sellers = getSellersCached(navigation);
-        Seller seller = getSeller(sellers.getData(), product);
 
-//        product.setSellerPrice(seller.getPrice().getAmount());
-//        product.setMeasureUnit(seller.getPrice().getMeasureUnit());
-//        internalDbAccess.saveOrUpdateEntity(product);
+        GetBuyerSellerResponse sellers = getBuyerSellersCached(navigation);
+        Contacts seller = getSeller(sellers.getData(), product);
+
+//        product.setSellerPrice(contact.getPrice().getAmount());
+//        product.setMeasureUnit(contact.getPrice().getMeasureUnit());
+        internalDbAccess.saveOrUpdateEntity(product);
         String split[] = itemName.split("-");
 
         String name;
@@ -2587,7 +3452,8 @@ public class JsonProcessor implements HttpUnitController {
 
         MenuName responseMenu = MenuName.CONFIRM;
 
-        AgNavigation navigation = getNavigationByMsisdn(msisdn);
+        AgNavigation navigation = HibernateUtils
+                .getNavigationByMsisdn(internalDbAccess, msisdn);
 
         MenuHistory menuHistory
                 = getMenuHistoryHelper(navigation.getMenuHistory());
@@ -2598,8 +3464,9 @@ public class JsonProcessor implements HttpUnitController {
         String itemName = data.getDataValue();
         String dataId = data.getDataId();
 
+        String ids[] = dataId.split("-");
         AgProduct product = fetchProduct(msisdn);
-        product.setBuyerId(Integer.valueOf(dataId));
+        product.setBuyerId(ids[0]);
         product.setBuyerName(itemName);
 
         GetBuyerResponse buyers = getBuyersCached(navigation);
@@ -2680,7 +3547,8 @@ public class JsonProcessor implements HttpUnitController {
         switch (function) {
 
             case SELL:
-                responseMenu = MenuName.CUSTOM_DISTRICT;
+                menuComponents = displayDistricts(requestInput, msisdn,
+                        menuNodes, newSessionID, region);
                 break;
 
             case MARKET_PRICES:
@@ -2689,22 +3557,22 @@ public class JsonProcessor implements HttpUnitController {
                 break;
 
             case SELLERS_TRADERS:
-                menuComponents = displaySellerDistricts(requestInput, msisdn,
+                menuComponents = displayBuyerSellerDistricts(requestInput, msisdn,
                         menuNodes, newSessionID, region);
                 break;
 
             case FIND_BUYERS:
-                menuComponents = displaySellerDistricts(requestInput, msisdn,
+                menuComponents = displayBuyerSellerDistricts(requestInput, msisdn,
                         menuNodes, newSessionID, region);
                 break;
 
             case INPUT_TOOLS:
-                menuComponents = displaySellerDistricts(requestInput, msisdn,
+                menuComponents = displayBuyerSellerDistricts(requestInput, msisdn,
                         menuNodes, newSessionID, region);
                 break;
 
             default:
-                responseMenu = MenuName.MARKET_DISTRICTS;
+                responseMenu = MenuName.MARKET_DISTRICT_PRICES;
                 break;
         }
 
@@ -2716,45 +3584,44 @@ public class JsonProcessor implements HttpUnitController {
         return menuComponents;
     }
 
-    UssdMenuComponents processBuyerLocation(String requestInput,
-            String clientMsisdn, Map<String, String> menuNodes,
-            String newSessionID) throws MyCustomException {
-
-        MenuName responseMenu = MenuName.MATCHED_BUYER_LIST;
-        BuyerLocation location;
-        switch (requestInput) {
-
-            case "1":
-                location = BuyerLocation.NEARBY;
-                break;
-
-            case "2":
-                location = BuyerLocation.NATIONAL;
-                break;
-
-            case "3":
-                location = BuyerLocation.INTERNATIONAL;
-                break;
-
-            default:
-                location = BuyerLocation.UNKNOWN;
-                break;
-        }
-
-        AgProduct product = fetchProduct(clientMsisdn);
-        product.setBuyerLocation(location);
-        internalDbAccess.saveOrUpdateEntity(product);
-
-        ScreenPagination screenPages = setBuyerNavigation(product);
-
-        UssdMenuComponents menuComponents
-                = breakIntoPages(requestInput, responseMenu,
-                        menuNodes, newSessionID, screenPages,
-                        new TitleAddition(true, product.getItemName()));
-
-        return menuComponents;
-    }
-
+//    UssdMenuComponents processBuyerLocation(String requestInput,
+//            String clientMsisdn, Map<String, String> menuNodes,
+//            String newSessionID) throws MyCustomException {
+//
+//        MenuName responseMenu = MenuName.MATCHED_BUYER_LIST;
+//        ItemLocation location;
+//        switch (requestInput) {
+//
+//            case "1":
+//                location = ItemLocation.NEARBY;
+//                break;
+//
+//            case "2":
+//                location = ItemLocation.NATIONAL;
+//                break;
+//
+//            case "3":
+//                location = ItemLocation.INTERNATIONAL;
+//                break;
+//
+//            default:
+//                location = ItemLocation.UNKNOWN;
+//                break;
+//        }
+//
+//        AgProduct product = fetchProduct(clientMsisdn);
+//        product.setItemLocation(location);
+//        internalDbAccess.saveOrUpdateEntity(product);
+//
+//        ScreenPagination screenPages = setBuyerNavigation(product);
+//
+//        UssdMenuComponents menuComponents
+//                = breakIntoPages(requestInput, responseMenu,
+//                        menuNodes, newSessionID, screenPages,
+//                        new TitleAddition(true, product.getItemName()));
+//
+//        return menuComponents;
+//    }
     UssdMenuComponents confirm(String requestInput, String clientMsisdn,
             Map<String, String> menuNodes, String newSessionID)
             throws MyCustomException {
@@ -2777,7 +3644,9 @@ public class JsonProcessor implements HttpUnitController {
                     ContactResponse response = contactRequest(product);
 
                 } else if (product.getUssdFunction()
-                        == UssdFunction.MATCHED_BUYERS) {
+                        == UssdFunction.MATCHED_BUYERS
+                        || product.getUssdFunction()
+                        == UssdFunction.FIND_BUYERS) {
 
                     responseMenu = MenuName.CONTACT_SELLER_MESSAGE;
                     ContactResponse response = contactRequest(product);
@@ -2857,7 +3726,7 @@ public class JsonProcessor implements HttpUnitController {
 
         for (HasChildrenItems cat : menuItemList) {
 
-            if (dataId == cat.getId()) {
+            if (String.valueOf(dataId) .equals(cat.getId())) {
                 return cat.getChildrenItems();
             }
         }
@@ -2977,6 +3846,122 @@ public class JsonProcessor implements HttpUnitController {
 //
 //        return menuComponents;
 //    }
+//    GetBuyerResponse getBuyersRemote(AgProduct product)
+//            throws MyCustomException {
+//
+//        int categoryId = product.getCategoryId();
+//        String transportArea = product.getTransportArea().getValue();
+//        String districtName = product.getDistrictName();
+//        int districtId = product.getDistrictId();
+//        int marketId = product.getMarketId();
+//        String region = product.getRegion().getValue();
+//        int subCategoryId = product.getSubCategoryId();
+//        ItemTag tag = product.getTag();
+//        String itemDescription = product.getItemDescription();
+//        String itemName = product.getItemName();
+//        String measure = product.getQuantity(); //in KG
+//        String userContact = product.getUserContact();
+//        int sellerPrice = product.getSellerPrice();
+//        String place = product.getPlace();
+//        int payMethod = product.getPaymentMethod();
+//        boolean matchedBuyers = product.isIsMatched();
+//
+//        GetBuyerRequest request = new GetBuyerRequest();
+//
+//        GetBuyerRequest.Params params = request.new Params();
+//        params.setBuyer("");
+//        params.setCategoryClass(tag.getValue());
+//        params.setCategoryId(categoryId);
+//        params.setSubCategoryId(subCategoryId);
+//        params.setCustomerMsisdn(userContact);
+//        params.setDistrict(districtName);
+//        params.setTransport(transportArea);
+//        params.setRegion(region);
+//
+//        Credentials credentials = new Credentials();
+//        credentials.setApiPassword("");
+//        credentials.setAppId("");
+//        credentials.setTokenId("");
+//
+//        request.setCredentials(credentials);
+//        request.setMethodName(
+//                APIMethodName.GET_BUYERS.getValue());
+//        request.setLocalise("english");//TODO: get language dynamically
+//        request.setParams(params);
+//
+//        String jsonReq = GeneralUtils.convertToJson(request,
+//                GetBuyerRequest.class);
+//        GeneralUtils.toPrettyJson(jsonReq);
+//
+//        String response = clientPool.sendRemoteRequest(jsonReq,
+//                remoteUnitConfig.getDSMBridgeRemoteUnit());
+//        //delete after tests
+////        String response
+////                = "{\n"
+////                + "    \"success\": true,\n"
+////                + "    \"data\": [\n"
+////                + "        {\n"
+////                + "            \"buyer_id\": 23,\n"
+////                + "            \"buyer_name\": \"Ozeki Junior\",\n"
+////                + "            \"contact\": \"256785243798\",\n"
+////                + "            \"buying\": [\n"
+////                + "                {\n"
+////                + "                    \"product_id\": 7487,\n"
+////                + "                    \"product_name\": \"Beans\",\n"
+////                + "                    \"category_class\":\"produce\",\n"
+////                + "                    \"transport\": \"NATIONAL\",\n"
+////                + "                    \"region\": \"WESTERN\",\n"
+////                + "                    \"district\": \"Kampala\",\n"
+////                + "                    \"buying_price\": {\n"
+////                + "                        \"amount\": 10000,\n"
+////                + "                        \"measure_unit\": \"KG\"\n"
+////                + "                    }\n"
+////                + "                },\n"
+////                + "                {\n"
+////                + "                    \"product_id\": 123,\n"
+////                + "                    \"product_name\": \"Fish fingerlings\",\n"
+////                + "                    \"category_class\":\"inputs\",\n"
+////                + "                    \"transport\": \"NATIONAL\",\n"
+////                + "                    \"region\": \"WESTERN\",\n"
+////                + "                    \"district\": \"Kampala\",\n"
+////                + "                    \"buying_price\": {\n"
+////                + "                        \"amount\": 10000,\n"
+////                + "                        \"measure_unit\": \"KG\"\n"
+////                + "                    }\n"
+////                + "                }\n"
+////                + "            ]\n"
+////                + "        },\n"
+////                + "        {\n"
+////                + "            \"buyer_id\": 13,\n"
+////                + "            \"buyer_name\": \"Ozeki Senior\",\n"
+////                + "            \"contact\": \"256774983602\",\n"
+////                + "            \"buying\": [\n"
+////                + "                {\n"
+////                + "                    \"product_id\": 103,\n"
+////                + "                    \"product_name\": \"Maize\",\n"
+////                + "                    \"category_class\":\"produce\",\n"
+////                + "                    \"transport\": \"NATIONAL\",\n"
+////                + "                    \"region\": \"WESTERN\",\n"
+////                + "                    \"district\": \"Kampala\",\n"
+////                + "                    \"buying_price\": {\n"
+////                + "                        \"amount\": 10000,\n"
+////                + "                        \"per\": \"KG\"\n"
+////                + "                    }\n"
+////                + "                }\n"
+////                + "\n"
+////                + "            ]\n"
+////                + "        }\n"
+////                + "    ]\n"
+////                + "}";
+//
+//        GetBuyerResponse buyerResponse
+//                = GeneralUtils.convertFromJson(response,
+//                        GetBuyerResponse.class);
+//
+//        GeneralUtils.toPrettyJson(response);
+//
+//        return buyerResponse;
+//    }
     AgLanguage updateUserLanguage(String requestInput, String msisdn)
             throws MyCustomException {
 
@@ -3000,7 +3985,8 @@ public class JsonProcessor implements HttpUnitController {
                 break;
         }
 
-        AgNavigation navigation = getNavigationByMsisdn(msisdn);
+        AgNavigation navigation = HibernateUtils
+                .getNavigationByMsisdn(internalDbAccess, msisdn);
         AgLanguage language = internalDbAccess.fetchEntity(AgLanguage.class,
                 "langId", langId);
         AgClient client = navigation.getClient();
@@ -3112,36 +4098,6 @@ public class JsonProcessor implements HttpUnitController {
         return responseString;
     }
 
-    AgNavigation getNavigationByMsisdn(String msisdn) throws MyCustomException {
-
-        Map<String, Object> resourceProps = new HashMap<>();
-        resourceProps.put("msisdn", new HashSet<>(Arrays.asList(msisdn)));
-        Set<AgNavigation> navigations = internalDbAccess
-                .fetchEntities(AgNavigation.FETCH_NAVIG_BY_MSISDN, resourceProps);
-
-        if (navigations == null || navigations.isEmpty()) {
-            return null;
-        }
-        return (AgNavigation) navigations.toArray()[0];
-
-    }
-
-    AgNavigation getNavigationBySession(String sessionId)
-            throws MyCustomException {
-
-        Map<String, Object> resourceProps = new HashMap<>();
-        resourceProps.put("sessionId", new HashSet<>(Arrays.asList(sessionId)));
-        Set<AgNavigation> navigations = internalDbAccess
-                .fetchEntities(AgNavigation.FETCH_NAVIG_BY_SESSIONID, resourceProps);
-
-        if (navigations == null || navigations.isEmpty()) {
-            return null;
-        }
-        return (AgNavigation) navigations.toArray()[0];
-        //return navigations.toArray(new AgNavigation[navigations.size()])[0];
-
-    }
-
     /**
      * Set the currentMenu start point - either at language or home menuData or
      * session-expired menuData
@@ -3157,23 +4113,37 @@ public class JsonProcessor implements HttpUnitController {
         String languageCode;
         MenuHistory menuHistory = null;
         NavigationBar navBar = NavigationBar.MAIN;
-        AgNavigation navigation = getNavigationByMsisdn(msisdn);
+        AgNavigation navigation = HibernateUtils
+                .getNavigationByMsisdn(internalDbAccess, msisdn);
 
+//        if (navigation == null) {
+//            languageCode = NamedConstants.DEFAULT_USSD_LANGUAGE_CODE;
+//            responseMenu = MenuName.LANGUAGE_MENU;
+//            navigation = addNavigatingClient(msisdn, sessionId, "0000");
+//        }
         if (navigation == null) {
 
-            languageCode = NamedConstants.DEFAULT_USSD_LANGUAGE_CODE;
-            responseMenu = MenuName.LANGUAGE_MENU;
-            navigation = addNavigatingClient(msisdn, sessionId);
+            navigation = addNavigatingClient(msisdn, sessionId, "1001");
+
+            AgClient client = navigation.getClient();
+            languageCode = client.getLanguage().getLangCode();
+            responseMenu = MenuName.MAIN_MENU;
+            navBar = NavigationBar.NONE;
 
         } else {
 
-            AgClient client = navigation.getClient();
             menuHistory = getMenuHistoryHelper(navigation.getMenuHistory());
             MenuHistory.Data menuData = getCurrentMenuData(menuHistory);
 
-            boolean sessionExpired = !menuData.isIsEnd();
+            MenuName currentMenu = MenuName.MAIN_MENU;
+            boolean sessionExpired = false;
+            if (menuData != null) {
+                currentMenu = getMenuName(menuData); //If on Main/Lang menu stay
+                sessionExpired = !menuData.isIsEnd();
+            }
+
+            AgClient client = navigation.getClient();
             languageCode = client.getLanguage().getLangCode();
-            MenuName currentMenu = getMenuName(menuData); //If on Main/Lang menu stay
             //
             //Conditions
             //1. if previous session expired - on another menuData 
@@ -3187,21 +4157,46 @@ public class JsonProcessor implements HttpUnitController {
             //TO-DO
             //Should we clear History Data for every new/Continue Dial ???
             //la-kso navigation.setMenuHistory("{}");
+            //
+            //
+            //comment out when language is working
+            //
+//            if (languageCode.equalsIgnoreCase("notset")
+//                    || currentMenu == MenuName.LANGUAGE_MENU) {
+//
+//                responseMenu = MenuName.LANGUAGE_MENU;
+//                languageCode = NamedConstants.DEFAULT_USSD_LANGUAGE_CODE;
+//                navBar = NavigationBar.NONE;
+//
+//            } 
             if (languageCode.equalsIgnoreCase("notset")
                     || currentMenu == MenuName.LANGUAGE_MENU) {
 
-                responseMenu = MenuName.LANGUAGE_MENU;
-                languageCode = NamedConstants.DEFAULT_USSD_LANGUAGE_CODE;
-                navBar = NavigationBar.NONE;
-                navigation.setMenuHistory("{}");
+                CheckAccountResponse checkAccResponse
+                        = getClientRegistrationRemote(msisdn);
+                boolean isRegistered = checkAccResponse.getData().isIsExist();
+
+                AgLanguage language = internalDbAccess.fetchEntity(AgLanguage.class,
+                        "langId", "1001");
+                client.setLanguage(language);
+                client.setIsRegistered(isRegistered);
+                if (isRegistered) {
+                    client.setName(checkAccResponse.getData().getName());
+                    client.setDistrict(checkAccResponse.getData().getDistrict());
+                }
+                navigation.setClient(client);
+
+                languageCode = client.getLanguage().getLangCode();
+                responseMenu = MenuName.MAIN_MENU;
 
             } else if (currentMenu == MenuName.MAIN_MENU) {
                 responseMenu = MenuName.MAIN_MENU;
-                navigation.setMenuHistory("{}");
+                navBar = NavigationBar.NONE;
 
             } else if (sessionExpired) {
 
-                responseMenu = checkIfContinueSession(msisdn, sessionId);
+                responseMenu = ProcessorUtils.
+                        checkIfContinueSession(internalDbAccess, msisdn, sessionId);
 
                 //To-DO I think if Session Has expired, we just need to display
                 //to the userContact the current session menu if less than 12hrs/valid
@@ -3213,9 +4208,15 @@ public class JsonProcessor implements HttpUnitController {
                 //on the 3rd / 6 buyer list menus - how do we treat this?
             } else {
                 responseMenu = MenuName.MAIN_MENU;
-                navigation.setMenuHistory("{}");
+                navBar = NavigationBar.NONE;
             }
         }
+
+        if (responseMenu != MenuName.CONTINUE_SESSION) {
+            // Overwrite/delete History dataItem
+            navigation.setMenuHistory("{}");
+        }
+        menuHistory = getMenuHistoryHelper(navigation.getMenuHistory());
 
         AgUssdMenu menu = retrieveMenuFromDB(responseMenu);
 
@@ -3272,61 +4273,6 @@ public class JsonProcessor implements HttpUnitController {
         return menuHistory.toString();
     }
 
-    MenuHistory popMostRecentMenuFromHistory(MenuHistory menuHistory) {
-
-        List<MenuHistory.Data> historyData = menuHistory.getMenuHistoryData();
-        int dataSize = historyData.size();
-        historyData.remove(dataSize - 1); //pop current menuData
-        menuHistory.setMenuHistoryData(historyData);
-
-        return menuHistory;
-    }
-
-//    MenuHistory.Data getCurrentMenuData(MenuHistory menuHistory, String msisdn)
-//            throws MyCustomException {
-//
-//        List<MenuHistory.Data> historyData = menuHistory.getMenuHistoryData();
-//        int dataSize = historyData.size();
-//
-//        MenuHistory.Data currentMenu = historyData.get(dataSize - 1);
-//
-//        if (MenuName.CONTINUE_SESSION == getMenuName(currentMenu)) {
-//            currentMenu = historyData.get(dataSize - 2); //get previous be4 add
-//            MenuHistory newMenuHistory//remove continue_sess
-//                    = popMostRecentMenuFromHistory(menuHistory);
-//
-//            AgNavigation navigation = getNavigationByMsisdn(msisdn);
-//            navigation.setMenuHistory(newMenuHistory.toString());
-//            internalDbAccess.saveOrUpdateEntity(navigation);
-//        }
-//
-//        return currentMenu;
-//
-//    }
-    MenuHistory.Data getCurrentMenuData(MenuHistory menuHistory)
-            throws MyCustomException {
-
-        List<MenuHistory.Data> historyData = menuHistory.getMenuHistoryData();
-        int dataSize = historyData.size();
-
-        MenuHistory.Data currentMenu = historyData.get(dataSize - 1);
-
-        return currentMenu;
-
-    }
-
-    MenuHistory.Data getSecondLastMenuData(MenuHistory menuHistory)
-            throws MyCustomException {
-
-        List<MenuHistory.Data> historyData = menuHistory.getMenuHistoryData();
-        int dataSize = historyData.size();
-
-        MenuHistory.Data currentMenu = historyData.get(dataSize - 2);
-
-        return currentMenu;
-
-    }
-
     MenuName getMenuName(MenuHistory.Data menuData) throws MyCustomException {
 
         return MenuName.convertToEnum(menuData.getMenuName());
@@ -3337,14 +4283,14 @@ public class JsonProcessor implements HttpUnitController {
         return MenuName.convertToEnum(menuNameString);
     }
 
-    String convertMenuNodeToString(String menuTitle,
+    String convertMenuNodeToString(String toLocalise,
             Map<String, String> menuNodes) {
 
         String localisedMenuTitle = "";
 
-        if (!(menuTitle == null || menuTitle.trim().isEmpty())) {
+        if (!(toLocalise == null || toLocalise.trim().isEmpty())) {
 
-            localisedMenuTitle = menuNodes.get(menuTitle);
+            localisedMenuTitle = menuNodes.get(toLocalise);
 
         }
         return localisedMenuTitle;
@@ -3482,6 +4428,11 @@ public class JsonProcessor implements HttpUnitController {
                         isRegistered);
                 break;
 
+            case SELECT_STATIC_DYNAMIC_MENU:
+                ussdMenuComponents = processStaticMenu(requestInput, menu,
+                        msisdn, menuNodes, sessionID, isRegistered);
+                break;
+
             case SELECT_STATIC_MENU:
                 ussdMenuComponents = processStaticMenu(requestInput, menu,
                         msisdn, menuNodes, sessionID, isRegistered);
@@ -3513,6 +4464,10 @@ public class JsonProcessor implements HttpUnitController {
                 isLocalised = Boolean.TRUE;
                 break;
 
+            case SELECT_STATIC_DYNAMIC_MENU:
+                isLocalised = Boolean.TRUE;
+                break;
+
             case SELECT_STATIC_MENU:
                 isLocalised = Boolean.FALSE;
                 break;
@@ -3532,7 +4487,8 @@ public class JsonProcessor implements HttpUnitController {
                 ussdMenuComponents.getScreenNum(),
                 ussdMenuComponents.getTotalScreens());
 
-        navigation = getNavigationByMsisdn(msisdn);
+        navigation = HibernateUtils
+                .getNavigationByMsisdn(internalDbAccess, msisdn);
 
         navigation.setMenuHistory(updatedHistory);
 
@@ -3562,13 +4518,18 @@ public class JsonProcessor implements HttpUnitController {
                 pageData = navigation.getSubCategoryNav();
                 break;
 
-            case MARKET_DISTRICTS:
-                pageData = navigation.getDistrictMarketsNav();
-                itemsPerScreen = SELLER_ITEMS_PER_SCREEN;
+            case SELECT_DISTRICT:
+                pageData = navigation.getDistrictsNav();
+                itemsPerScreen = SIX_ITEMS_PER_SCREEN;
                 break;
 
-            case SELLER_DISTRICTS:
-                pageData = navigation.getDistrictSellersNav();
+            case MARKET_DISTRICT_PRICES:
+                pageData = navigation.getDistrictMarketsNav();
+                itemsPerScreen = THREE_ITEMS_PER_SCREEN;
+                break;
+
+            case BUYER_SELLER_DISTRICTS:
+                pageData = navigation.getDistrictBuyerSellerNav();
                 break;
 
             case MARKETS:
@@ -3579,9 +4540,9 @@ public class JsonProcessor implements HttpUnitController {
                 pageData = navigation.getMarketPriceNav();
                 break;
 
-            case SELLER_LIST:
-                pageData = navigation.getSellersNav();
-                itemsPerScreen = SELLER_ITEMS_PER_SCREEN;
+            case BUYER_SELLER_LIST:
+                pageData = navigation.getBuyerSellerNav();
+                itemsPerScreen = SIX_ITEMS_PER_SCREEN;
                 break;
 
             case MATCHED_BUYER_LIST:
@@ -3590,6 +4551,21 @@ public class JsonProcessor implements HttpUnitController {
 
             case MATCHED_PRODUCTS:
                 pageData = navigation.getMatchedProductsNav();
+                break;
+
+            case FARMING_TIPS_CATEGORY:
+                pageData = navigation.getFarmingTipsNav();
+                itemsPerScreen = SIX_ITEMS_PER_SCREEN;
+                break;
+
+            case FARMING_TIPS_TOPICS:
+                pageData = navigation.getFarmingTopicsNav();
+                itemsPerScreen = FOUR_ITEMS_PER_SCREEN;
+                break;
+
+            case FARMING_TIPS_CHAPTERS:
+                pageData = navigation.getFarmingChaptersNav();
+                itemsPerScreen = FOUR_ITEMS_PER_SCREEN;
                 break;
 
             default:
@@ -3655,7 +4631,8 @@ public class JsonProcessor implements HttpUnitController {
             String sessionId)
             throws MyCustomException {
 
-        AgNavigation navigation = getNavigationByMsisdn(msisdn);
+        AgNavigation navigation = HibernateUtils
+                .getNavigationByMsisdn(internalDbAccess, msisdn);
         checkSession(navigation, sessionId);
         AgLanguage language = navigation.getClient().getLanguage();
         Map<String, String> menuNodes = getLocalisedMenuNodes(language);
@@ -3664,6 +4641,10 @@ public class JsonProcessor implements HttpUnitController {
         NextNavigation nextNavigation;
         NavigationInput input = NavigationInput.convertToEnum(requestInput);
         String menuTitle;
+
+        //clear menu history if coming from continue session & user selected NO
+        navigation = refreshMenuHistory(input, navigation);
+
         switch (input) {
 
             case MAIN: //00
@@ -3708,7 +4689,7 @@ public class JsonProcessor implements HttpUnitController {
         return nextNavigation;
     }
 
-    private CheckAccountResponse getClientRegistration(String msisdn)
+    private CheckAccountResponse getClientRegistrationRemote(String msisdn)
             throws MyCustomException {
 
         CheckAccountRequest request = new CheckAccountRequest();
@@ -3723,6 +4704,7 @@ public class JsonProcessor implements HttpUnitController {
 
         request.setCredentials(credentials);
         request.setMethodName(APIMethodName.ACCOUNT_EXISTS.getValue());
+        request.setLocalise("english");//TODO: get language dynamically
         request.setParams(params);
 
         String jsonReq = GeneralUtils.convertToJson(request,
@@ -3731,16 +4713,18 @@ public class JsonProcessor implements HttpUnitController {
 
         String response = clientPool.sendRemoteRequest(jsonReq,
                 remoteUnitConfig.getDSMBridgeRemoteUnit());
+
 //        String response = "{\n"
 //                + "  \"success\": true,\n"
 //                + "  \"data\": {\n"
-//                + "    \"user_id\": \"" + msisdn + "\",\n"
-//                + "    \"is_exist\":false,\n"
-//                + "    \"status\": \"REGISTERED\", // |   REGISTERED\n"
-//                + "    \"description\": \"New client registered\"\n"
+//                + "    \"user_id\": \"256784725338\",\n"
+//                + "    \"is_exist\":true,\n"
+//                + "    \"account_status\": \"REGISTERED\", \n"
+//                + "    \"name\": \"Musa Ozeki\", \n"
+//                + "    \"district\": \"Kampala\",\n"
+//                + "    \"description\": \"New client\"\n"
 //                + "  }\n"
 //                + "}";
-
         CheckAccountResponse checkAccResponse = GeneralUtils
                 .convertFromJson(response, CheckAccountResponse.class);
 
@@ -3748,16 +4732,20 @@ public class JsonProcessor implements HttpUnitController {
 
     }
 
-    private AgNavigation addNavigatingClient(String msisdn, String sessionId)
+    private AgNavigation addNavigatingClient(
+            String msisdn,
+            String sessionId,
+            String langCode)
             throws MyCustomException {
 
-        CheckAccountResponse checkAccResponse = getClientRegistration(msisdn);
+        CheckAccountResponse checkAccResponse
+                = getClientRegistrationRemote(msisdn);
         boolean isRegistered = checkAccResponse.getData().isIsExist();
 
         AgClient client = new AgClient();
         client.setMsisdn(msisdn);
         AgLanguage language = internalDbAccess.fetchEntity(AgLanguage.class,
-                "langId", "0000");
+                "langId", langCode);
         client.setLanguage(language);
         client.setIsRegistered(isRegistered);
         if (isRegistered) {
@@ -3793,7 +4781,7 @@ public class JsonProcessor implements HttpUnitController {
 //
 //        buyerRequest.setCredentials(credentials);
 //        buyerRequest.setMethodName(APIMethodName.GET_BUYERS.getValue());
-//        buyerRequest.setLocalise("english");//TODO: get language dynamically
+//        buyerRequest.setLocalise("english");//TODO: get language a
 //        buyerRequest.setParams(params);
 //
 //        String jsonReq
@@ -3950,6 +4938,16 @@ public class JsonProcessor implements HttpUnitController {
 
     }
 
+    GetFarmingTipsResponse getFarmingTipsCategoriesCached(AgNavigation navigation)
+            throws MyCustomException {
+
+        GetFarmingTipsResponse marketInfo
+                = GeneralUtils.convertFromJson(navigation.getAllFarmingTips(),
+                        GetFarmingTipsResponse.class);
+        return marketInfo;
+
+    }
+
     GetCategoryResponse getCategoriesCached(AgNavigation navigation)
             throws MyCustomException {
 
@@ -3972,6 +4970,17 @@ public class JsonProcessor implements HttpUnitController {
 
     }
 
+    GetDistrictResponse getDistrictsCached(AgNavigation navigation)
+            throws MyCustomException {
+
+        GetDistrictResponse info
+                = GeneralUtils.convertFromJson(
+                        navigation.getAllDistrictInfo(),
+                        GetDistrictResponse.class);
+        return info;
+
+    }
+
     MarketPriceResponse2 getMarketPrices2Cached(AgNavigation navigation)
             throws MyCustomException {
 
@@ -3983,13 +4992,12 @@ public class JsonProcessor implements HttpUnitController {
 
     }
 
-    GetSellersResponse getSellersCached(AgNavigation navigation)
+    GetBuyerSellerResponse getBuyerSellersCached(AgNavigation navigation)
             throws MyCustomException {
 
-        GetSellersResponse allInfo
-                = GeneralUtils.convertFromJson(
-                        navigation.getAllSellersInfo(),
-                        GetSellersResponse.class);
+        GetBuyerSellerResponse allInfo
+                = GeneralUtils.convertFromJson(navigation.getAllBuyerSellerInfo(),
+                        GetBuyerSellerResponse.class);
         return allInfo;
 
     }
@@ -4003,6 +5011,7 @@ public class JsonProcessor implements HttpUnitController {
         int districtId = product.getDistrictId();
         int marketId = product.getMarketId();
         String region = product.getRegion().getValue();
+        int regionId = product.getRegion().getIntValue();
         int subCategoryId = product.getSubCategoryId();
         ItemTag tag = product.getTag();
         String itemDescription = product.getItemDescription();
@@ -4012,34 +5021,40 @@ public class JsonProcessor implements HttpUnitController {
         int sellerPrice = product.getSellerPrice();
         String measureUnit = product.getMeasureUnit();
         String place = product.getPlace();
-        String payMethod = product.getPaymentMethod();
-        int sellerId = product.getSellerId();
+        int payMethod = product.getPaymentMethod();
+        String sellerId = product.getSellerId();
 
         UssdFunction function = product.getUssdFunction();
         int price;
-        int contactPersonId;
-        APIMethodName method;
+        String contactPersonId;
+        APIMethodName method = APIMethodName.CONTACT;
+        PersonToContact personToContact;
+
+        ContactRequest request = new ContactRequest();
+        ContactRequest.Params params = request.new Params();
+
         if (function == UssdFunction.SELLERS_TRADERS
+                || function == UssdFunction.FIND_BUYERS
                 || function == UssdFunction.INPUT_TOOLS) {
 
             contactPersonId = product.getSellerId();
             price = product.getSellerPrice();
-            method = APIMethodName.CONTACT_SELLER;
+            personToContact = PersonToContact.SELLER;
 
         } else {
             contactPersonId = product.getBuyerId();
             price = product.getBuyerPrice();
-            method = APIMethodName.CONTACT_BUYER;
+            personToContact = PersonToContact.BUYER;
         }
 
-        ContactRequest request = new ContactRequest();
-
-        ContactRequest.Params params = request.new Params();
+        params.setCategoryClass(tag == null
+                ? ItemTag.PRODUCE.getValue() : tag.getValue());
         params.setCustomerMsisdn(userContact);
         params.setCategoryId(categoryId);
         params.setSubCategoryId(subCategoryId);
         params.setContactPersonId(contactPersonId);
         params.setPrice(new Price(price, measureUnit));
+        params.setPersonToContact(personToContact.getValue());
 
         Credentials credentials = new Credentials();
         credentials.setApiPassword("");
@@ -4078,10 +5093,10 @@ public class JsonProcessor implements HttpUnitController {
 
         int categoryId = product.getCategoryId();
         String transportArea = product.getTransportArea().getValue();
-        String districtName = product.getDistrictName();
         int districtId = product.getDistrictId();
         int marketId = product.getMarketId();
         String region = product.getRegion().getValue();
+        int regionId = product.getRegion().getIntValue();
         int subCategoryId = product.getSubCategoryId();
         ItemTag tag = product.getTag();
         String itemDescription = product.getItemDescription();
@@ -4090,18 +5105,20 @@ public class JsonProcessor implements HttpUnitController {
         String sellerContact = product.getUserContact();
         int sellerPrice = product.getSellerPrice();
         String place = product.getPlace();
-        String payMethod = product.getPaymentMethod();
+        int payMethod = product.getPaymentMethod();
+        String districtName = product.getDistrictName();
 
         MarketPriceRequest marketPriceRequest = new MarketPriceRequest();
 
         MarketPriceRequest.Params params = marketPriceRequest.new Params();
         params.setCategoryId(categoryId);
-        params.setSubcategoryId(categoryId);
+        params.setSubcategoryId(subCategoryId);
         params.setCategoryClass(tag.getValue());
         params.setMarketId(marketId);
         params.setDistrictId(districtId);
         params.setTransportArea(transportArea);
         params.setRegion(region);
+        params.setRegionId(regionId);
 
         Credentials credentials = new Credentials();
         credentials.setApiPassword("");
@@ -4227,37 +5244,40 @@ public class JsonProcessor implements HttpUnitController {
         return uploadResponse;
     }
 
-    GetSellersResponse getSellersBuyersRemote(AgProduct product)
+    GetBuyerSellerResponse getSellersBuyersRemote(AgProduct product)
             throws MyCustomException {
 
         int categoryId = product.getCategoryId();
         int subCategoryId = product.getSubCategoryId();
         String transportArea = product.getTransportArea().getValue();
-        String districtName = product.getDistrictName();
-        int districtId = product.getDistrictId();
-        int marketId = product.getMarketId();
-        String region = product.getRegion().getValue();
+        String region = product.getRegion().name();
+        int regionId = product.getRegion().getIntValue();
         ItemTag tag = product.getTag();
+        int districtId = product.getDistrictId();
+        String sellerBuyerContact = product.getUserContact();
+        boolean isMatched = product.isIsMatched();
+        UssdFunction function = product.getUssdFunction();
         String itemDescription = product.getItemDescription();
         String itemName = product.getItemName();
         String measure = product.getQuantity(); //in KG
-        String sellerContact = product.getUserContact();
         int sellerPrice = product.getSellerPrice();
         String place = product.getPlace();
-        String payMethod = product.getPaymentMethod();
-        boolean isMatched = product.isIsMatched();
-        UssdFunction function = product.getUssdFunction();
+        int payMethod = product.getPaymentMethod();
+        String districtName = product.getDistrictName();
+        int marketId = product.getMarketId();
 
-        GetSellersRequest sellersRequest = new GetSellersRequest();
+        GetBuyerSellerRequest sellersRequest = new GetBuyerSellerRequest();
 
-        GetSellersRequest.Params params = sellersRequest.new Params();
+        GetBuyerSellerRequest.Params params = sellersRequest.new Params();
         params.setCategoryId(categoryId);
         params.setSubCategoryId(subCategoryId);
         params.setCategoryClass(tag.getValue().toLowerCase());
         params.setDistrictId(districtId);
         params.setTransport(transportArea);
         params.setRegion(region);
+        params.setRegionId(regionId);
         params.setIsMatched(isMatched);
+        params.setMsisdn(sellerBuyerContact);
 
         Credentials credentials = new Credentials();
         credentials.setApiPassword("");
@@ -4266,7 +5286,9 @@ public class JsonProcessor implements HttpUnitController {
 
         String api = APIMethodName.GET_SELLERS.getValue();
 
-        if (function == UssdFunction.FIND_BUYERS) {
+        if (function == UssdFunction.FIND_BUYERS
+                || function == UssdFunction.MATCHED_BUYERS) {
+
             api = APIMethodName.GET_BUYERS.getValue();
         }
 
@@ -4276,12 +5298,13 @@ public class JsonProcessor implements HttpUnitController {
         sellersRequest.setParams(params);
 
         String jsonReq = GeneralUtils.convertToJson(sellersRequest,
-                GetSellersRequest.class);
+                GetBuyerSellerRequest.class);
         GeneralUtils.toPrettyJson(jsonReq);
 
         String response = clientPool.sendRemoteRequest(jsonReq,
                 remoteUnitConfig.getDSMBridgeRemoteUnit());
-        //delete after tests
+
+//        delete after tests
 //        String response
 //                = "{\n"
 //                + "    \"success\": true,\n"
@@ -4289,12 +5312,14 @@ public class JsonProcessor implements HttpUnitController {
 //                + "        \"category_id\": 123,\n"
 //                + "        \"sub_category_id\": 22,\n"
 //                + "        \"category_class\": \"inputs\",\n"
-//                + "        \"region\": \"CENTRAL\",\n"
+//                + "        \"region_name\": \"CENTRAL\",\n"
+//                + "        \"region_id\": 7,\n"
 //                + "        \"districts\": [\n"
 //                + "            {\n"
 //                + "                \"id\": 21,\n"
 //                + "                \"name\": \"Kampala\",\n"
-//                + "                \"sellers\": [\n"
+//                + "                \"item_location\": \"NEARBY\",\n"
+//                + "                \"contacts\": [\n"
 //                + "                    {\n"
 //                + "                        \"id\": 3,\n"
 //                + "                        \"name\": \"Ozeki\",\n"
@@ -4302,13 +5327,13 @@ public class JsonProcessor implements HttpUnitController {
 //                + "                        \"products\": [\n"
 //                + "                            {\n"
 //                + "                                \"id\": 44,\n"
-//                + "                                \"item_name\": \"Dried tilapia\",\n"
+//                + "                                \"item_title\": \"Dried tilapia\",\n"
 //                + "                                \"price\": 2300,\n"
 //                + "                                \"measure_unit\": \"KG\"\n"
 //                + "                            },\n"
 //                + "                            {\n"
 //                + "                                \"id\": 45,\n"
-//                + "                                \"item_name\": \"Fresh tilapia\",\n"
+//                + "                                \"item_title\": \"Fresh tilapia\",\n"
 //                + "                                \"price\": 2250,\n"
 //                + "                                \"measure_unit\": \"KG\"\n"
 //                + "                            }\n"
@@ -4321,7 +5346,7 @@ public class JsonProcessor implements HttpUnitController {
 //                + "                        \"products\": [\n"
 //                + "                            {\n"
 //                + "                                \"id\": 46,\n"
-//                + "                                \"item_name\": \"mukene omusiike\",\n"
+//                + "                                \"item_title\": \"mukene omusiike\",\n"
 //                + "                                \"price\": 500,\n"
 //                + "                                \"measure_unit\": \"omukono\"\n"
 //                + "                            }\n"
@@ -4332,7 +5357,8 @@ public class JsonProcessor implements HttpUnitController {
 //                + "            {\n"
 //                + "                \"id\": 23,\n"
 //                + "                \"name\": \"Mukono\",\n"
-//                + "                \"sellers\": [\n"
+//                + "                \"item_location\": \"NATIONAL\",\n"
+//                + "                \"contacts\": [\n"
 //                + "                    {\n"
 //                + "                        \"id\": 3,\n"
 //                + "                        \"name\": \"SmallG\",\n"
@@ -4340,7 +5366,7 @@ public class JsonProcessor implements HttpUnitController {
 //                + "                        \"products\": [\n"
 //                + "                            {\n"
 //                + "                                \"id\": 44,\n"
-//                + "                                \"item_name\": \"Gonja\",\n"
+//                + "                                \"item_title\": \"Gonja\",\n"
 //                + "                                \"price\": 15000,\n"
 //                + "                                \"measure_unit\": \"enkota\"\n"
 //                + "                            }\n"
@@ -4351,14 +5377,80 @@ public class JsonProcessor implements HttpUnitController {
 //                + "        ]\n"
 //                + "    }\n"
 //                + "}";
-
-        GetSellersResponse uploadResponse
+        GetBuyerSellerResponse uploadResponse
                 = GeneralUtils.convertFromJson(response,
-                        GetSellersResponse.class);
+                        GetBuyerSellerResponse.class);
 
         GeneralUtils.toPrettyJson(response);
 
         return uploadResponse;
+    }
+
+    GetDistrictResponse getDistrictsRemote(AgProduct product)
+            throws MyCustomException {
+
+        GetDistrictRequest districtsRequest = new GetDistrictRequest();
+        GetDistrictRequest.Params params = districtsRequest.new Params();
+        params.setRegionId(product.getRegion().getIntValue());
+
+        Credentials credentials = new Credentials();
+        credentials.setApiPassword("");
+        credentials.setAppId("");
+        credentials.setTokenId("");
+
+        districtsRequest.setCredentials(credentials);
+        districtsRequest.setMethodName(APIMethodName.GET_DISTRICTS.getValue());
+        districtsRequest.setLocalise("english");//TODO: get language dynamically
+        districtsRequest.setParams(params);
+
+        String jsonReq = GeneralUtils.convertToJson(districtsRequest,
+                GetDistrictRequest.class);
+        GeneralUtils.toPrettyJson(jsonReq);
+
+        String response = clientPool.sendRemoteRequest(jsonReq,
+                remoteUnitConfig.getDSMBridgeRemoteUnit());
+        //delete after tests
+//        String response = "{\n"
+//                + "    \"success\": true,\n"
+//                + "    \"data\": [\n"
+//                + "        {\n"
+//                + "            \"id\": 30,\n"
+//                + "            \"name\": \"Kampala\"\n"
+//                + "        },\n"
+//                + "        {\n"
+//                + "            \"id\": 31,\n"
+//                + "            \"name\": \"Mukono\"\n"
+//                + "        },\n"
+//                + "        {\n"
+//                + "            \"id\": 32,\n"
+//                + "            \"name\": \"Wakiso\"\n"
+//                + "        },\n"
+//                + "        {\n"
+//                + "            \"id\": 33,\n"
+//                + "            \"name\": \"Jinja\"\n"
+//                + "        },\n"
+//                + "        {\n"
+//                + "            \"id\": 34,\n"
+//                + "            \"name\": \"Kiboga\"\n"
+//                + "        },\n"
+//                + "        {\n"
+//                + "            \"id\": 35,\n"
+//                + "            \"name\": \"Luweero\"\n"
+//                + "        },\n"
+//                + "        {\n"
+//                + "            \"id\": 36,\n"
+//                + "            \"name\": \"Masaka\"\n"
+//                + "        },\n"
+//                + "        {\n"
+//                + "            \"id\": 37,\n"
+//                + "            \"name\": \"Mpigi\"\n"
+//                + "        }\n"
+//                + "    ]\n"
+//                + "}";
+
+        GetDistrictResponse districtsResponse = GeneralUtils
+                .convertFromJson(response, GetDistrictResponse.class);
+        return districtsResponse;
     }
 
     GetCategoryResponse getCategoriesRemote(AgProduct product)
@@ -4367,6 +5459,8 @@ public class JsonProcessor implements HttpUnitController {
         String categoryClass = product.getTag().getValue().toLowerCase();
         int categoryId = product.getCategoryId();
         int subCategoryId = product.getSubCategoryId();
+        String ussdFunction = product.getUssdFunction().getValue();
+        String msisdn = product.getUserContact();
 
         GetCategoryRequest categoryRequest = new GetCategoryRequest();
 
@@ -4374,6 +5468,8 @@ public class JsonProcessor implements HttpUnitController {
         params.setCategoryClass(categoryClass);
         params.setCategoryId(categoryId);
         params.setSubCategoryId(subCategoryId);
+        params.setFunction(ussdFunction);
+        params.setMsisdn(msisdn);
 
         Credentials credentials = new Credentials();
         credentials.setApiPassword("");
@@ -4618,134 +5714,545 @@ public class JsonProcessor implements HttpUnitController {
         return categoryResponse;
     }
 
-    GetBuyerResponse getBuyersRemote(AgProduct product)
+    GetFarmingTipsResponse getFarmingTipsRemote(AgProduct product)
             throws MyCustomException {
+        
+        logger.debug("Sending requesting to get farming tips remote::");
 
-        int categoryId = product.getCategoryId();
-        String transportArea = product.getTransportArea().getValue();
-        String districtName = product.getDistrictName();
-        int districtId = product.getDistrictId();
-        int marketId = product.getMarketId();
-        String region = product.getRegion().getValue();
-        int subCategoryId = product.getSubCategoryId();
-        ItemTag tag = product.getTag();
-        String itemDescription = product.getItemDescription();
-        String itemName = product.getItemName();
-        String measure = product.getQuantity(); //in KG
-        String userContact = product.getUserContact();
-        int sellerPrice = product.getSellerPrice();
-        String place = product.getPlace();
-        String payMethod = product.getPaymentMethod();
-        boolean matchedBuyers = product.isIsMatched();
+        String categoryClass = product.getTag().getValue().toLowerCase();
 
-        GetBuyerRequest request = new GetBuyerRequest();
+        GetFarmingTipsRequest farmingTipsRequest = new GetFarmingTipsRequest();
 
-        GetBuyerRequest.Params params = request.new Params();
-        params.setMatchedBuyers(matchedBuyers);
-        params.setBuyer("");
-        params.setCategoryClass(tag.getValue());
-        params.setCategoryId(categoryId);
-        params.setSubCategoryId(subCategoryId);
-        params.setCustomerMsisdn(userContact);
-        params.setDistrict(districtName);
-        params.setTransport(transportArea);
-        params.setRegion(region);
+        GetFarmingTipsRequest.Params params = farmingTipsRequest.new Params();
+        params.setFarmingTipsCategory(categoryClass);
 
         Credentials credentials = new Credentials();
         credentials.setApiPassword("");
         credentials.setAppId("");
         credentials.setTokenId("");
 
-        request.setCredentials(credentials);
-        request.setMethodName(
-                APIMethodName.GET_BUYERS.getValue());
-        request.setLocalise("english");//TODO: get language dynamically
-        request.setParams(params);
+        farmingTipsRequest.setCredentials(credentials);
+        farmingTipsRequest.setMethodName(APIMethodName.FARMING_TIPS.getValue());
+        farmingTipsRequest.setLocalise("english");//TODO: get language dynamically
+        farmingTipsRequest.setParams(params);
 
-        String jsonReq = GeneralUtils.convertToJson(request,
-                GetBuyerRequest.class);
+        String jsonReq = GeneralUtils.convertToJson(farmingTipsRequest,
+                GetFarmingTipsRequest.class);
+        
+        logger.debug("Start - get farming tips from remote:: ");
         GeneralUtils.toPrettyJson(jsonReq);
+        logger.debug("End - farming tips from remote:: ");
 
         String response = clientPool.sendRemoteRequest(jsonReq,
                 remoteUnitConfig.getDSMBridgeRemoteUnit());
         //delete after tests
-//        String response
-//                = "{\n"
+//        String response = "{\n"
 //                + "    \"success\": true,\n"
 //                + "    \"data\": [\n"
 //                + "        {\n"
-//                + "            \"buyer_id\": 23,\n"
-//                + "            \"buyer_name\": \"Ozeki Junior\",\n"
-//                + "            \"contact\": \"256785243798\",\n"
-//                + "            \"buying\": [\n"
+//                + "            \"tip_id\": 1,\n"
+//                + "            \"tip_name\": \"Ponds\",\n"
+//                + "            \"topics\": [\n"
 //                + "                {\n"
-//                + "                    \"product_id\": 7487,\n"
-//                + "                    \"product_name\": \"Beans\",\n"
-//                + "                    \"category_class\":\"produce\",\n"
-//                + "                    \"transport\": \"NATIONAL\",\n"
-//                + "                    \"region\": \"WESTERN\",\n"
-//                + "                    \"district\": \"Kampala\",\n"
-//                + "                    \"buying_price\": {\n"
-//                + "                        \"amount\": 10000,\n"
-//                + "                        \"measure_unit\": \"KG\"\n"
-//                + "                    }\n"
+//                + "                    \"id\": 1,\n"
+//                + "                    \"name\": \"Pond site Selection\",\n"
+//                + "                    \"chapters\": [\n"
+//                + "                        {\n"
+//                + "                            \"id\": 1,\n"
+//                + "                            \"name\": \"Introduction\",\n"
+//                + "                            \"content\": \"In land-based aquaculture, the most commonly used culture units are earthen ponds.\"\n"
+//                + "\n"
+//                + "                        },\n"
+//                + "                        {\n"
+//                + "                            \"id\": 2,\n"
+//                + "                            \"name\": \"Main factors\",\n"
+//                + "                            \"content\": \"The main physical factors to consider are the land area, thewater supply, and the soil.\"\n"
+//                + "                        },\n"
+//                + "                        {\n"
+//                + "                            \"id\": 3,\n"
+//                + "                            \"name\": \"Other factors\",\n"
+//                + "                            \"content\": \"The other factors to consider are nearness to the market, infrastructure like road & electricity,availability of inputs, legal issues.\"\n"
+//                + "                        }\n"
+//                + "                    ]\n"
 //                + "                },\n"
 //                + "                {\n"
-//                + "                    \"product_id\": 123,\n"
-//                + "                    \"product_name\": \"Fish fingerlings\",\n"
-//                + "                    \"category_class\":\"inputs\",\n"
-//                + "                    \"transport\": \"NATIONAL\",\n"
-//                + "                    \"region\": \"WESTERN\",\n"
-//                + "                    \"district\": \"Kampala\",\n"
-//                + "                    \"buying_price\": {\n"
-//                + "                        \"amount\": 10000,\n"
-//                + "                        \"measure_unit\": \"KG\"\n"
-//                + "                    }\n"
+//                + "                    \"id\": 2,\n"
+//                + "                    \"name\": \"Pond Construction\",\n"
+//                + "                    \"chapters\": [\n"
+//                + "                        {\n"
+//                + "                            \"id\": 1,\n"
+//                + "                            \"name\": \"Pond sides\",\n"
+//                + "                            \"content\": \"Well compacted pond leveeswith a slope of at least 2:1 for commercial grow-out ponds.\"\n"
+//                + "\n"
+//                + "                        },\n"
+//                + "                        {\n"
+//                + "                            \"id\": 2,\n"
+//                + "                            \"name\": \"Water depth\",\n"
+//                + "                            \"content\": \"Average water depth in pond of 1 – 1.2 meters (0.8 – 1.0 m at shallow end to 1.0 – 1.5 m at the deep end).\"\n"
+//                + "                        },\n"
+//                + "                        {\n"
+//                + "                            \"id\": 3,\n"
+//                + "                            \"name\": \"Inlet pipe\",\n"
+//                + "                            \"content\": \"Inlet pipe at least 20 cm above the pond water level and screened with a properly fitted filter sock.\"\n"
+//                + "                        },\n"
+//                + "                        {\n"
+//                + "                            \"id\": 4,\n"
+//                + "                            \"name\": \"Outlet pipe\",\n"
+//                + "                            \"content\": \"Outlet pipe fitted with an anti-seep collar and screened correctly with cone mesh.\"\n"
+//                + "                        },\n"
+//                + "                        {\n"
+//                + "                            \"id\": 5,\n"
+//                + "                            \"name\": \"Freeboard\",\n"
+//                + "                            \"content\": \"Freeboard of about 15-30 cm. Ponds less than 400m² can have freeboards of 15 cm.\"\n"
+//                + "                        },\n"
+//                + "                        {\n"
+//                + "                            \"id\": 6,\n"
+//                + "                            \"name\": \"Harvest basin\",\n"
+//                + "                            \"content\": \"Having a harvest basin within the pond is optional but can be quite useful at final harvest.\"\n"
+//                + "                        },\n"
+//                + "                        {\n"
+//                + "                            \"id\": 7,\n"
+//                + "                            \"name\": \"Pond bottom\",\n"
+//                + "                            \"content\": \"The pond must be able to drain completely for complete harvesting and drying.\"\n"
+//                + "                        }\n"
+//                + "\n"
+//                + "                    ]\n"
+//                + "                },\n"
+//                + "                {\n"
+//                + "                    \"id\": 3,\n"
+//                + "                    \"name\": \"Pond preparation for stocking\",\n"
+//                + "                    \"chapters\": [\n"
+//                + "                        {\n"
+//                + "                            \"id\": 1,\n"
+//                + "                            \"name\": \"Silt\",\n"
+//                + "                            \"content\": \"Silt removed from bottom should be put where it came from i.e. used to repair pond. Excess should NOT be put at top of dykes.\"\n"
+//                + "                        },\n"
+//                + "                        {\n"
+//                + "                            \"id\": 2,\n"
+//                + "                            \"name\": \"Pond leakage\",\n"
+//                + "                            \"content\": \"Ensure pond is not leaking.\"\n"
+//                + "                        },\n"
+//                + "                        {\n"
+//                + "                            \"id\": 3,\n"
+//                + "                            \"name\": \"Screening\",\n"
+//                + "                            \"content\": \"Correctly screen the inlet and outlet.\"\n"
+//                + "                        },\n"
+//                + "                        {\n"
+//                + "                            \"id\": 4,\n"
+//                + "                            \"name\": \"Liming\",\n"
+//                + "                            \"content\": \"Lime the bottom of the ponds, if needed, based upon alkalinity and hardness levels (especially of new ponds).\"\n"
+//                + "                        },\n"
+//                + "                        {\n"
+//                + "                            \"id\": 5,\n"
+//                + "                            \"name\": \"Filling pond\",\n"
+//                + "                            \"content\": \"Fill pond. Ponds should be stocked within a week of filling with water.\"\n"
+//                + "                        }\n"
+//                + "                    ]\n"
+//                + "                },\n"
+//                + "                {\n"
+//                + "                    \"id\": 4,\n"
+//                + "                    \"name\": \"Pond stocking\",\n"
+//                + "                    \"chapters\": [\n"
+//                + "                        {\n"
+//                + "                            \"id\": 1,\n"
+//                + "                            \"name\": \"Conditioning\",\n"
+//                + "                            \"content\": \"Stock only fish in good condition. Stock fish with no obvious signs of injury, excessive stress or disease.\"\n"
+//                + "                        },\n"
+//                + "                        {\n"
+//                + "                            \"id\": 2,\n"
+//                + "                            \"name\": \"Number to stock\",\n"
+//                + "                            \"content\": \"Stock based upon targeted harvest size and the pond’s carrying capacity.\"\n"
+//                + "                        },\n"
+//                + "                        {\n"
+//                + "                            \"id\": 3,\n"
+//                + "                            \"name\": \"Size to stock\",\n"
+//                + "                            \"content\": \"The minimum stocking size for grow-out ponds should be fish of not less than 10 cm in length or 5 grams average weight.\"\n"
+//                + "                        },\n"
+//                + "                        {\n"
+//                + "                            \"id\": 4,\n"
+//                + "                            \"name\": \"Harvest size\",\n"
+//                + "                            \"content\": \"The targeted harvest size will be intended market size if you are not following a split production plan.\"\n"
+//                + "                        },\n"
+//                + "                        {\n"
+//                + "                            \"id\": 5,\n"
+//                + "                            \"name\": \"Critical standing crop\",\n"
+//                + "                            \"content\": \"The critical standing crop for ponds of avg water depth of 1m fed on pellets is 1.5 to 1.8 kg/m². Max feed input is 20 g/m²/day.\"\n"
+//                + "                        }\n"
+//                + "                    ]\n"
+//                + "                },\n"
+//                + "                {\n"
+//                + "                    \"id\": 5,\n"
+//                + "                    \"name\": \"Pond management\",\n"
+//                + "                    \"chapters\": [\n"
+//                + "                        {\n"
+//                + "                            \"id\": 1,\n"
+//                + "                            \"name\": \"Water quality\",\n"
+//                + "                            \"content\": \"Do Not flush water through pond; should only be added to ponds:- to top up water levels, or to correct water quality problems.\"\n"
+//                + "                        },\n"
+//                + "                        {\n"
+//                + "                            \"id\": 2,\n"
+//                + "                            \"name\": \"Water exchange\",\n"
+//                + "                            \"content\": \"Continuous water flow would be more expensive, but would allow for higher carrying capacity and requires more time.\"\n"
+//                + "                        }\n"
+//                + "                    ]\n"
+//                + "                },\n"
+//                + "                {\n"
+//                + "                    \"id\": 6,\n"
+//                + "                    \"name\": \"Feeding\",\n"
+//                + "                    \"chapters\": [\n"
+//                + "                        {\n"
+//                + "                            \"id\": 1,\n"
+//                + "                            \"name\": \"Train fish\",\n"
+//                + "                            \"content\": \"Train fish to feed in the same area of the pond.\"\n"
+//                + "                        },\n"
+//                + "                        {\n"
+//                + "                            \"id\": 2,\n"
+//                + "                            \"name\": \"Training benefits\",\n"
+//                + "                            \"content\": \"Training fish to feed enables a farmer to see his/her fish daily throughout the production cycle. It also helps monitor fish health.\"\n"
+//                + "                        },\n"
+//                + "                        {\n"
+//                + "                            \"id\": 3,\n"
+//                + "                            \"name\": \"Feed by response\",\n"
+//                + "                            \"content\": \"Feed fish based upon their feeding response using the feed chart as a guide to estimate daily feeding needs.\"\n"
+//                + "                        },\n"
+//                + "                        {\n"
+//                + "                            \"id\": 4,\n"
+//                + "                            \"name\": \"Feed records\",\n"
+//                + "                            \"content\": \"Keep recommended feeding records including both the amounts given and response at each feed.\"\n"
+//                + "                        },\n"
+//                + "                        {\n"
+//                + "                            \"id\": 5,\n"
+//                + "                            \"name\": \"Feed performance\",\n"
+//                + "                            \"content\": \"Use the records continuously to evaluate feeding performance in tandem with the pond records to adjust the feeding regime.\"\n"
+//                + "                        }\n"
+//                + "                    ]\n"
+//                + "                },\n"
+//                + "                {\n"
+//                + "                    \"id\": 7,\n"
+//                + "                    \"name\": \"Sampling\",\n"
+//                + "                    \"chapters\": [\n"
+//                + "                        {\n"
+//                + "                            \"id\": 1,\n"
+//                + "                            \"name\": \"Sampling frequency\",\n"
+//                + "                            \"content\": \"Sample monthly by seining a small portion of the pond to monitor for growth\"\n"
+//                + "                        },\n"
+//                + "                        {\n"
+//                + "                            \"id\": 2,\n"
+//                + "                            \"name\": \"Feed amounts\",\n"
+//                + "                            \"content\": \"Calculate new feed amounts based upon the actual average fish weights obtained at sampling.\"\n"
+//                + "                        },\n"
+//                + "                        {\n"
+//                + "                            \"id\": 3,\n"
+//                + "                            \"name\": \"Sampling data\",\n"
+//                + "                            \"content\": \"Record data correctly at each sampling. This helps with inventory control & monitor progression to the pond’s critical standing crop.\"\n"
+//                + "                        }\n"
+//                + "                    ]\n"
+//                + "                },\n"
+//                + "                {\n"
+//                + "                    \"id\": 8,\n"
+//                + "                    \"name\": \"Harvesting\",\n"
+//                + "                    \"chapters\": [\n"
+//                + "                        {\n"
+//                + "                            \"id\": 1,\n"
+//                + "                            \"name\": \"When to harvest\",\n"
+//                + "                            \"content\": \"In order to obtain the best returns, the pond should be harvested before it reaches its carrying capacity, at critical standing crop.\"\n"
+//                + "                        },\n"
+//                + "                        {\n"
+//                + "                            \"id\": 2,\n"
+//                + "                            \"name\": \"First step at harvest\",\n"
+//                + "                            \"content\": \"First, check your records and know your estimated standing crop.\"\n"
+//                + "                        },\n"
+//                + "                        {\n"
+//                + "                            \"id\": 3,\n"
+//                + "                            \"name\": \"Second step at harvest\",\n"
+//                + "                            \"content\": \"Second, seine the pond one or two times to remove the bulk of the fish when the pond is still full.\"\n"
+//                + "                        },\n"
+//                + "                        {\n"
+//                + "                            \"id\": 4,\n"
+//                + "                            \"name\": \"Third step at harvest\",\n"
+//                + "                            \"content\": \"Third, reduce the water level about halfway then seine once or twice to remove the rest of the fish.\"\n"
+//                + "                        },\n"
+//                + "                        {\n"
+//                + "                            \"id\": 5,\n"
+//                + "                            \"name\": \"Fourth step at harvest\",\n"
+//                + "                            \"content\": \"Fourth, drain the pond completely and pick up the rest of the fish. \"\n"
+//                + "                        }\n"
+//                + "                    ]\n"
+//                + "                },\n"
+//                + "                {\n"
+//                + "                    \"id\": 9,\n"
+//                + "                    \"name\": \"Record keeping\",\n"
+//                + "                    \"chapters\": [\n"
+//                + "                        {\n"
+//                + "                            \"id\": 1,\n"
+//                + "                            \"name\": \"Keep records\",\n"
+//                + "                            \"content\": \"Pond and feed records must be kept correctly as recommended.\"\n"
+//                + "                        },\n"
+//                + "                        {\n"
+//                + "                            \"id\": 2,\n"
+//                + "                            \"name\": \"Expenses\",\n"
+//                + "                            \"content\": \"Records of all inputs used in production e.g. pond repairs, etc. as well as of all sales should be kept so as to calculate profit.\"\n"
+//                + "                        }\n"
+//                + "                    ]\n"
 //                + "                }\n"
 //                + "            ]\n"
 //                + "        },\n"
 //                + "        {\n"
-//                + "            \"buyer_id\": 13,\n"
-//                + "            \"buyer_name\": \"Ozeki Senior\",\n"
-//                + "            \"contact\": \"256774983602\",\n"
-//                + "            \"buying\": [\n"
+//                + "            \"tip_id\": 2,\n"
+//                + "            \"tip_name\": \"Cages\",\n"
+//                + "            \"topics\": [\n"
 //                + "                {\n"
-//                + "                    \"product_id\": 103,\n"
-//                + "                    \"product_name\": \"Maize\",\n"
-//                + "                    \"category_class\":\"produce\",\n"
-//                + "                    \"transport\": \"NATIONAL\",\n"
-//                + "                    \"region\": \"WESTERN\",\n"
-//                + "                    \"district\": \"Kampala\",\n"
-//                + "                    \"buying_price\": {\n"
-//                + "                        \"amount\": 10000,\n"
-//                + "                        \"per\": \"KG\"\n"
-//                + "                    }\n"
-//                + "                }\n"
+//                + "                    \"id\": 1,\n"
+//                + "                    \"name\": \"Site Selection\",\n"
+//                + "                    \"chapters\": [\n"
+//                + "                        {\n"
+//                + "                            \"id\": 1,\n"
+//                + "                            \"name\": \"Pond Levees\",\n"
+//                + "                            \"content\": \"The pond levees must be well compacted with a slope of atleast 2:1\"\n"
 //                + "\n"
+//                + "                        },\n"
+//                + "                        {\n"
+//                + "                            \"id\": 2,\n"
+//                + "                            \"name\": \"Water depth\",\n"
+//                + "                            \"content\": \"The Water depth is supposed...\"\n"
+//                + "                        }\n"
+//                + "                    ]\n"
+//                + "                },\n"
+//                + "                {\n"
+//                + "                    \"id\": 1,\n"
+//                + "                    \"name\": \"Site Selection\",\n"
+//                + "                    \"chapters\": [\n"
+//                + "                        {\n"
+//                + "                            \"id\": 1,\n"
+//                + "                            \"name\": \"Macropyte-free\",\n"
+//                + "                            \"content\": \"Cages should be installed in macrophyte-free areas with good water quality and water exchange.\"\n"
+//                + "\n"
+//                + "                        },\n"
+//                + "                        {\n"
+//                + "                            \"id\": 2,\n"
+//                + "                            \"name\": \"Navigation route\",\n"
+//                + "                            \"content\": \"Cages should not interfere with navigation or other uses of the water body.\"\n"
+//                + "                        },\n"
+//                + "                        {\n"
+//                + "                            \"id\": 3,\n"
+//                + "                            \"name\": \"Water quality\",\n"
+//                + "                            \"content\": \"Site in water with suitable water quality characteristics for tilapia culture taking note of sediment characteristics.\"\n"
+//                + "                        }\n"
+//                + "                    ]\n"
+//                + "                },\n"
+//                + "                {\n"
+//                + "                    \"id\": 2,\n"
+//                + "                    \"name\": \"Cage construction\",\n"
+//                + "                    \"chapters\": [\n"
+//                + "                        {\n"
+//                + "                            \"id\": 1,\n"
+//                + "                            \"name\": \"Cage design\",\n"
+//                + "                            \"content\": \"Cages should be constructed to facilitate water exchange through the cage and prevent fish escapes from the cage.\"\n"
+//                + "\n"
+//                + "                        }\n"
+//                + "                    ]\n"
+//                + "                },\n"
+//                + "                {\n"
+//                + "                    \"id\": 3,\n"
+//                + "                    \"name\": \"Positioning of cages\",\n"
+//                + "                    \"chapters\": [\n"
+//                + "                        {\n"
+//                + "                            \"id\": 1,\n"
+//                + "                            \"name\": \"Placing cages\",\n"
+//                + "                            \"content\": \"Cages should be positioned to enhance water exchange.\"\n"
+//                + "\n"
+//                + "                        }\n"
+//                + "                    ]\n"
+//                + "                },\n"
+//                + "                {\n"
+//                + "                    \"id\": 4,\n"
+//                + "                    \"name\": \"Stocking cages\",\n"
+//                + "                    \"chapters\": [\n"
+//                + "                        {\n"
+//                + "                            \"id\": 1,\n"
+//                + "                            \"name\": \"Conditioning\",\n"
+//                + "                            \"content\": \"Stock only healthy, well-conditioned, uniform sized fish.\"\n"
+//                + "\n"
+//                + "                        },\n"
+//                + "                        {\n"
+//                + "                            \"id\": 2,\n"
+//                + "                            \"name\": \"Records\",\n"
+//                + "                            \"content\": \"Record source, number and weight of fish stocked. Take note of other observations.\"\n"
+//                + "                        },\n"
+//                + "                        {\n"
+//                + "                            \"id\": 3,\n"
+//                + "                            \"name\": \"Carrying capacity\",\n"
+//                + "                            \"content\": \"Stock based on carrying capacity. The carrying capacity for Low Volume High Density cages is 150-190 kg/m3\"\n"
+//                + "                        }\n"
+//                + "                    ]\n"
+//                + "                },\n"
+//                + "                {\n"
+//                + "                    \"id\": 5,\n"
+//                + "                    \"name\": \"Feeding\",\n"
+//                + "                    \"chapters\": [\n"
+//                + "                        {\n"
+//                + "                            \"id\": 1,\n"
+//                + "                            \"name\": \"Conserve feed\",\n"
+//                + "                            \"content\": \"Apply feeds conservatively to minimize wastes using a feeding ring or demand feeder.\"\n"
+//                + "\n"
+//                + "                        },\n"
+//                + "                        {\n"
+//                + "                            \"id\": 2,\n"
+//                + "                            \"name\": \"High quality feed\",\n"
+//                + "                            \"content\": \"Use high quality non-polluting feeds. Floating pellets are recommended.\"\n"
+//                + "                        },\n"
+//                + "                        {\n"
+//                + "                            \"id\": 3,\n"
+//                + "                            \"name\": \"Feed by response\",\n"
+//                + "                            \"content\": \"Feed by response using feeding chart as an aid. Adjust feed requirements monthly based on average fish smaple size.\"\n"
+//                + "                        },\n"
+//                + "                        {\n"
+//                + "                            \"id\": 4,\n"
+//                + "                            \"name\": \"Wastes\",\n"
+//                + "                            \"content\": \"Wastes from feeding should not exceed the carrying capacity of the containing water body.\"\n"
+//                + "                        },\n"
+//                + "                        {\n"
+//                + "                            \"id\": 5,\n"
+//                + "                            \"name\": \"FCR\",\n"
+//                + "                            \"content\": \"Aim at an FCR of not more than 1.7.\"\n"
+//                + "                        }\n"
+//                + "                    ]\n"
+//                + "                },\n"
+//                + "                {\n"
+//                + "                    \"id\": 6,\n"
+//                + "                    \"name\": \"Harvesting\",\n"
+//                + "                    \"chapters\": [\n"
+//                + "                        {\n"
+//                + "                            \"id\": 1,\n"
+//                + "                            \"name\": \"Record harvest\",\n"
+//                + "                            \"content\": \"Record number and weight of all fish harvested.\"\n"
+//                + "\n"
+//                + "                        },\n"
+//                + "                        {\n"
+//                + "                            \"id\": 2,\n"
+//                + "                            \"name\": \"Mortalities\",\n"
+//                + "                            \"content\": \"Mortalities should be recorded.\"\n"
+//                + "                        },\n"
+//                + "                        {\n"
+//                + "                            \"id\": 3,\n"
+//                + "                            \"name\": \"Survival\",\n"
+//                + "                            \"content\": \"Calculate total survival and overall FCR after each cycle.\"\n"
+//                + "                        }\n"
+//                + "                    ]\n"
+//                + "                },\n"
+//                + "                {\n"
+//                + "                    \"id\": 7,\n"
+//                + "                    \"name\": \"Health & predators\",\n"
+//                + "                    \"chapters\": [\n"
+//                + "                        {\n"
+//                + "                            \"id\": 1,\n"
+//                + "                            \"name\": \"Handling\",\n"
+//                + "                            \"content\": \"Minimise handling stress at all times\"\n"
+//                + "\n"
+//                + "                        },\n"
+//                + "                        {\n"
+//                + "                            \"id\": 2,\n"
+//                + "                            \"name\": \"Non lethal control\",\n"
+//                + "                            \"content\": \"Discourage birds and other predators by nonlethal means.\"\n"
+//                + "                        },\n"
+//                + "                        {\n"
+//                + "                            \"id\": 3,\n"
+//                + "                            \"name\": \"Cover cages\",\n"
+//                + "                            \"content\": \"Keep cages covered while in production.\"\n"
+//                + "                        }\n"
+//                + "                    ]\n"
+//                + "                },\n"
+//                + "                {\n"
+//                + "                    \"id\": 8,\n"
+//                + "                    \"name\": \"Record keeping\",\n"
+//                + "                    \"chapters\": [\n"
+//                + "                        {\n"
+//                + "                            \"id\": 1,\n"
+//                + "                            \"name\": \"Records to Keep\",\n"
+//                + "                            \"content\": \"Keep the recommended feeding and cage management records.\"\n"
+//                + "\n"
+//                + "                        },\n"
+//                + "                        {\n"
+//                + "                            \"id\": 2,\n"
+//                + "                            \"name\": \"Water quality\",\n"
+//                + "                            \"content\": \"Record details of water quality daily for temperature & dissolved oxygen on the cage management sheet.\"\n"
+//                + "                        },\n"
+//                + "                        {\n"
+//                + "                            \"id\": 3,\n"
+//                + "                            \"name\": \"Expenses & sales\",\n"
+//                + "                            \"content\": \"Keep financial and sales records.\"\n"
+//                + "                        }\n"
+//                + "                    ]\n"
+//                + "                },\n"
+//                + "                {\n"
+//                + "                    \"id\": 9,\n"
+//                + "                    \"name\": \"Environmental issues\",\n"
+//                + "                    \"chapters\": [\n"
+//                + "                        {\n"
+//                + "                            \"id\": 1,\n"
+//                + "                            \"name\": \"Waste disposal\",\n"
+//                + "                            \"content\": \"Collect feed bags and other solids wastes and dispose of them responsibly.\"\n"
+//                + "\n"
+//                + "                        },\n"
+//                + "                        {\n"
+//                + "                            \"id\": 2,\n"
+//                + "                            \"name\": \"Dead fish\",\n"
+//                + "                            \"content\": \"Remove dead fish daily and dispose of them by burying or burning..\"\n"
+//                + "                        },\n"
+//                + "                        {\n"
+//                + "                            \"id\": 3,\n"
+//                + "                            \"name\": \"Clean cage bags\",\n"
+//                + "                            \"content\": \"When cages are removed for cleaning, debris removed should not be discharged into public waters.\"\n"
+//                + "                        },\n"
+//                + "                        {\n"
+//                + "                            \"id\": 4,\n"
+//                + "                            \"name\": \"Move cages\",\n"
+//                + "                            \"content\": \"Cages should be moved frequently to prevent excessive build-up of waste beneath them.\"\n"
+//                + "                        }\n"
+//                + "                    ]\n"
+//                + "                }\n"
 //                + "            ]\n"
 //                + "        }\n"
 //                + "    ]\n"
 //                + "}";
 
-        GetBuyerResponse buyerResponse
-                = GeneralUtils.convertFromJson(response,
-                        GetBuyerResponse.class);
-
-        GeneralUtils.toPrettyJson(response);
-
-        return buyerResponse;
+        GetFarmingTipsResponse tipsResponse = GeneralUtils
+                .convertFromJson(response, GetFarmingTipsResponse.class);
+        return tipsResponse;
     }
 
-//    GetBuyerResponse getBuyers(boolean onlyMatchedBuyers,
-//            String sellerContact, String itemCategory)
-//            throws MyCustomException {
+    //    boolean sendContactBuyerRequest(AgProduct productSale,
+//            boolean isContactBuyer) throws MyCustomException {
 //
-//        GetBuyerRequest buyerRequest = new GetBuyerRequest();
+//        int buyerId = productSale.getBuyerId();
+//        int buyerPrice = productSale.getBuyerPrice();
+//        String buyerName = productSale.getBuyerName();
+//        String itemDescription = productSale.getItemDescription();
+//        String itemName = productSale.getItemName();
+//        String quantity = productSale.getQuantity();
+//        String sellerBuyerContact = productSale.getUserContact();
+//        int sellerPrice = productSale.getSellerPrice();
+//        String transportArea = productSale.getTransportArea().getValue();
+//        String itemLocation = productSale.getDistrictName();
+//        String payMethod = productSale.getPaymentMethod();
 //
-//        GetBuyerRequest.Params params = buyerRequest.new Params();
-//        params.setCategory(itemCategory);
-//        params.setBuyer(sellerContact);
-//        params.setOnlyMatchedBuyers(onlyMatchedBuyers);
+//        ContactBuyerRequest buyerRequest = new ContactBuyerRequest();
+//
+//        ContactBuyerRequest.Params params = buyerRequest.new Params();
+//        ContactBuyerRequest.Selling selling = buyerRequest.new Selling();
+//
+//        selling.setItemDescription(itemDescription);
+//        selling.setItemLocation(itemLocation);
+//        selling.setItemName(itemName);
+//        selling.setPaymentMethod(payMethod);
+//        selling.setSellerPrice(sellerPrice);
+//        selling.setQuantity(quantity);
+//        selling.setTransportArea(transportArea);
+//
+//        params.setIsContactBuyer(isContactBuyer);
+//        params.setBuyerId("" + buyerId);
+//        params.setSellerContact(sellerBuyerContact);
+//        params.setSelling(selling);
 //
 //        Credentials credentials = new Credentials();
 //        credentials.setApiPassword("");
@@ -4753,86 +6260,50 @@ public class JsonProcessor implements HttpUnitController {
 //        credentials.setTokenId("");
 //
 //        buyerRequest.setCredentials(credentials);
-//        buyerRequest.setMethodName(APIMethodName.GET_BUYERS.getValue());
+//        buyerRequest.setMethodName(APIMethodName.CONTACT_BUYER.getValue());
 //        buyerRequest.setLocalise("english");//TODO: get language dynamically
 //        buyerRequest.setParams(params);
 //
 //        String jsonReq = GeneralUtils.convertToJson(buyerRequest,
-//                GetBuyerRequest.class);
+//                ContactBuyerRequest.class);
 //        GeneralUtils.toPrettyJson(jsonReq);
 //
-//        //String response = clientPool.sendRemoteRequest(jsonReq, dsmRemoteUnit);
+//        String response = clientPool.sendRemoteRequest(jsonReq,
+//                remoteUnitConfig.getDSMBridgeRemoteUnit());
 //        //delete after tests
-//        String response = "{\n"
-//                + "    \"success\": true,\n"
-//                + "    \"data\": [\n"
-//                + "        {\n"
-//                + "            \"category\": \"FISH\",\n"
-//                + "            \"buyers\": [\n"
-//                + "                {\n"
-//                + "                    \"id\": 23,\n"
-//                + "                    \"name\": \"Ozeki Junior\",\n"
-//                + "                    \"contact\": \"256785243798\",\n"
-//                + "                    \"cost_per_kg\":\"10,000\",\n"
-//                + "                    \"region\": \"CENTRAL\",\n"
-//                + "                    \"district\": \"Kampala\"\n"
-//                + "                },\n"
-//                + "                {\n"
-//                + "                    \"id\": 24,\n"
-//                + "                    \"name\": \"SmallGod Senior\",\n"
-//                + "                    \"contact\": \"256785243790\",\n"
-//                + "                    \"cost_per_kg\":\"12,000\",\n"
-//                + "                    \"region\": \"CENTRAL\",\n"
-//                + "                    \"district\": \"Kampala\"\n"
-//                + "                }\n"
-//                + "            ]\n"
-//                + "        },\n"
-//                + "        {\n"
-//                + "            \"category\": \"MAIZE\",\n"
-//                + "            \"buyers\": [\n"
-//                + "                {\n"
-//                + "                    \"id\": 3,\n"
-//                + "                    \"name\": \"Ozeki Junior\",\n"
-//                + "                    \"contact\": \"256785243798\",\n"
-//                + "                    \"cost_per_kg\":10000,\n"
-//                + "                    \"region\": \"CENTRAL\",\n"
-//                + "                    \"district\": \"Kampala\"\n"
-//                + "                },\n"
-//                + "                {\n"
-//                + "                    \"id\": 6,\n"
-//                + "                    \"name\": \"SmallGod Senior\",\n"
-//                + "                    \"contact\": \"256785243790\",\n"
-//                + "                    \"cost_per_kg\":10000,\n"
-//                + "                    \"region\": \"CENTRAL\",\n"
-//                + "                    \"district\": \"Kampala\"\n"
-//                + "                }\n"
-//                + "            ]\n"
-//                + "        }\n"
-//                + "    ]\n"
-//                + "}";
+////        String response
+////                = "{\n"
+////                + "    \"success\": true,\n"
+////                + "    \"data\": []\n"
+////                + "}";
 //
-//        GetBuyerResponse buyerResponse
-//                = GeneralUtils.convertFromJson(response, GetBuyerResponse.class);
-//        return buyerResponse;
+//        ContactResponse buyerResponse
+//                = GeneralUtils.convertFromJson(response,
+//                        ContactResponse.class);
+//
+//        GeneralUtils.toPrettyJson(response);
+//
+//        return buyerResponse.isSuccess();
 //    }
-    boolean uploadItemForSale(AgProduct productSale,
+    boolean uploadItemForSale(AgProduct product,
             boolean isContactBuyer) throws MyCustomException {
 
-        int categoryId = productSale.getCategoryId();
-        String transportArea = productSale.getTransportArea().getValue();
-        String districtName = productSale.getDistrictName();
-        int districtId = productSale.getDistrictId();
-        int marketId = productSale.getMarketId();
-        String region = productSale.getRegion().getValue();
-        int subCategoryId = productSale.getSubCategoryId();
-        ItemTag tag = productSale.getTag();
-        String itemDescription = productSale.getItemDescription();
-        String itemName = productSale.getItemName();
-        String measure = productSale.getQuantity(); //in KG
-        String sellerContact = productSale.getUserContact();
-        int sellerPrice = productSale.getSellerPrice();
-        String place = productSale.getPlace();
-        String payMethod = productSale.getPaymentMethod();
+        int categoryId = product.getCategoryId();
+        String transportArea = product.getTransportArea().getValue();
+        String districtName = product.getDistrictName();
+        int districtId = product.getDistrictId();
+        int marketId = product.getMarketId();
+        String region = product.getRegion().getValue();
+        int regionId = product.getRegion().getIntValue();
+        int subCategoryId = product.getSubCategoryId();
+        ItemTag tag = product.getTag();
+        String itemDescription = product.getItemDescription();
+        String itemName = product.getItemName();
+        String measure = product.getQuantity(); //in KG
+        String sellerContact = product.getUserContact();
+        int sellerPrice = product.getSellerPrice();
+        String place = product.getPlace();
+        int payMethod = product.getPaymentMethod();
 
         ItemUploadRequest itemUploadRequest = new ItemUploadRequest();
 
@@ -4842,7 +6313,9 @@ public class JsonProcessor implements HttpUnitController {
                 = params.new ItemLocation();
         itemLocation.setPlace(place);
         itemLocation.setDistrict(districtName);
+        itemLocation.setDistrictId(districtId);
         itemLocation.setRegion(region);
+        itemLocation.setRegionId(regionId);
 
         ItemUploadRequest.Params.Quantity quantity = params.new Quantity();
         quantity.setMeasure(measure);
@@ -4894,71 +6367,6 @@ public class JsonProcessor implements HttpUnitController {
         GeneralUtils.toPrettyJson(response);
 
         return uploadResponse.isSuccess();
-    }
-
-    boolean sendContactBuyerRequest(AgProduct productSale,
-            boolean isContactBuyer) throws MyCustomException {
-
-        int buyerId = productSale.getBuyerId();
-        int buyerPrice = productSale.getBuyerPrice();
-        String buyerName = productSale.getBuyerName();
-        String itemDescription = productSale.getItemDescription();
-        String itemName = productSale.getItemName();
-        String quantity = productSale.getQuantity();
-        String sellerContact = productSale.getUserContact();
-        int sellerPrice = productSale.getSellerPrice();
-        String transportArea = productSale.getTransportArea().getValue();
-        String itemLocation = productSale.getDistrictName();
-        String payMethod = productSale.getPaymentMethod();
-
-        ContactBuyerRequest buyerRequest = new ContactBuyerRequest();
-
-        ContactBuyerRequest.Params params = buyerRequest.new Params();
-        ContactBuyerRequest.Selling selling = buyerRequest.new Selling();
-
-        selling.setItemDescription(itemDescription);
-        selling.setItemLocation(itemLocation);
-        selling.setItemName(itemName);
-        selling.setPaymentMethod(payMethod);
-        selling.setSellerPrice(sellerPrice);
-        selling.setQuantity(quantity);
-        selling.setTransportArea(transportArea);
-
-        params.setIsContactBuyer(isContactBuyer);
-        params.setBuyerId("" + buyerId);
-        params.setSellerContact(sellerContact);
-        params.setSelling(selling);
-
-        Credentials credentials = new Credentials();
-        credentials.setApiPassword("");
-        credentials.setAppId("");
-        credentials.setTokenId("");
-
-        buyerRequest.setCredentials(credentials);
-        buyerRequest.setMethodName(APIMethodName.CONTACT_BUYER.getValue());
-        buyerRequest.setLocalise("english");//TODO: get language dynamically
-        buyerRequest.setParams(params);
-
-        String jsonReq = GeneralUtils.convertToJson(buyerRequest,
-                ContactBuyerRequest.class);
-        GeneralUtils.toPrettyJson(jsonReq);
-
-        String response = clientPool.sendRemoteRequest(jsonReq,
-                remoteUnitConfig.getDSMBridgeRemoteUnit());
-        //delete after tests
-//        String response
-//                = "{\n"
-//                + "    \"success\": true,\n"
-//                + "    \"data\": []\n"
-//                + "}";
-//
-        ContactResponse buyerResponse
-                = GeneralUtils.convertFromJson(response,
-                        ContactResponse.class);
-
-        GeneralUtils.toPrettyJson(response);
-
-        return buyerResponse.isSuccess();
     }
 
     String getIdFromChosenInput(String requestInput, String menuOptionIds) {
@@ -5017,7 +6425,7 @@ public class JsonProcessor implements HttpUnitController {
 
     MenuName sellingCentralKampal() {
 
-        MenuName newMenu = MenuName.SELLER_LIST;
+        MenuName newMenu = MenuName.BUYER_SELLER_LIST;
 
         //do some processing if any
         return newMenu;
@@ -5207,22 +6615,6 @@ public class JsonProcessor implements HttpUnitController {
         return newMenu;
     }
 
-    MenuName tilapiaBuyers() {
-
-        MenuName newMenu = MenuName.BUYER_LOCATION;
-
-        //do some processing if any
-        return newMenu;
-    }
-
-    MenuName catFishBuyers() {
-
-        MenuName newMenu = MenuName.BUYER_LOCATION;
-
-        //do some processing if any
-        return newMenu;
-    }
-
     MenuName yesUpload() {
 
         MenuName newMenu = MenuName.UPLOAD_MSG;
@@ -5282,7 +6674,8 @@ public class JsonProcessor implements HttpUnitController {
     NextNavigation continueSession(String msisdn, String newSessionId)
             throws MyCustomException {
 
-        AgNavigation navigation = getNavigationByMsisdn(msisdn);
+        AgNavigation navigation = HibernateUtils
+                .getNavigationByMsisdn(internalDbAccess, msisdn);
 
         logger.debug("Menu History: " + navigation.getMenuHistory());
 
@@ -5293,33 +6686,19 @@ public class JsonProcessor implements HttpUnitController {
 
         MenuHistory.Data menuData = getCurrentMenuData(menuHistory);
 
-        navigation.setSessionId(newSessionId);
+        //to prevent having long string objects stored in DB - truncate history
+        List<MenuHistory.Data> historyData = menuHistory.getMenuHistoryData();
+        MenuHistory.Data item = historyData.remove(historyData.size() - 1); //pop current menuData
+        historyData.clear();
+        historyData.add(item);
+        menuHistory.setMenuHistoryData(historyData);
+
         navigation.setMenuHistory(menuHistory.toString());
+        navigation.setSessionId(newSessionId);
         internalDbAccess.saveOrUpdateEntity(navigation);
 
         return new NextNavigation(navigation,
                 menuData.getMenuString(), menuData.isIsEnd());
-    }
-
-    MenuName checkIfContinueSession(String msisdn, String newSessionId)
-            throws MyCustomException {
-
-        AgNavigation navigation = getNavigationByMsisdn(msisdn);
-
-        MenuName newMenu;
-
-        int hours = DateUtils.getHoursTakenToNow(navigation.getDateLastModified());
-
-        //Put this in Config File
-        if (hours > NamedConstants.SAVED_SESSION_VALIDITY) {
-
-            newMenu = MenuName.MAIN_MENU;
-            navigation.setMenuHistory("{}"); //overwrite/delete History dataItem
-
-            return newMenu;
-        }
-
-        return MenuName.CONTINUE_SESSION;
     }
 
     MenuName inputsAndTools() {
@@ -5340,7 +6719,7 @@ public class JsonProcessor implements HttpUnitController {
 
     MenuName learningCategory() {
 
-        MenuName newMenu = MenuName.LEARNING_SUBCATEGORY1;
+        MenuName newMenu = MenuName.FARMING_TIPS_CATEGORY;
 
         //do some processing if any
         return newMenu;
@@ -5348,7 +6727,7 @@ public class JsonProcessor implements HttpUnitController {
 
     MenuName learningSubCategories1() {
 
-        MenuName newMenu = MenuName.LEARNING_SUBCATEGORY2;
+        MenuName newMenu = MenuName.FARMING_TIPS_TOPICS;
 
         //do some processing if any
         return newMenu;
@@ -5356,7 +6735,7 @@ public class JsonProcessor implements HttpUnitController {
 
     MenuName learningSubCategories2() {
 
-        MenuName newMenu = MenuName.LEARNING_SUBCATEGORY3;
+        MenuName newMenu = MenuName.FARMING_TIPS_CHAPTERS;
 
         //do some processing if any
         return newMenu;
@@ -5645,6 +7024,31 @@ public class JsonProcessor implements HttpUnitController {
             isSessionOk = Boolean.FALSE;
         }
         return isSessionOk;
+    }
+
+    ItemLocation getItemLocationHelper(String requestInput) {
+
+        ItemLocation location;
+        switch (requestInput) {
+
+            case "1":
+                location = ItemLocation.NEARBY;
+                break;
+
+            case "2":
+                location = ItemLocation.NATIONAL;
+                break;
+
+            case "3":
+                location = ItemLocation.INTERNATIONAL;
+                break;
+
+            default:
+                location = ItemLocation.UNKNOWN;
+                break;
+        }
+
+        return location;
     }
 
     private void unKnownMethodNameError() throws MyCustomException {

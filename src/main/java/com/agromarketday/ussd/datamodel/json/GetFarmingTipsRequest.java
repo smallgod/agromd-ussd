@@ -2,11 +2,11 @@ package com.agromarketday.ussd.datamodel.json;
 
 import com.google.gson.annotations.SerializedName;
 
-public class CreateAccountRequest {
+public class GetFarmingTipsRequest {
 
     /*
         {
-            "method": "CREATE_ACCOUNT",
+            "method": "FARMING_TIPS", //
             "localise": "english",
             "credentials": {
               "app_id": "",
@@ -14,15 +14,15 @@ public class CreateAccountRequest {
               "token_id": ""
             },
             "params": {
-              "name": "SmallG",
-              "districtId": "Kampala",//why should a user belong to a districtId/region ?? Commodities should but users dont have to!!
-              "msisdn": "256784725338"
+              "farmingTipsCategory":"Fish Farming"
             }
           }
-        }
      */
     @SerializedName(value = "method")
     private String methodName;
+    
+     @SerializedName(value = "localise")
+    private String localise;
 
     @SerializedName(value = "credentials")
     private Credentials credentials;
@@ -54,42 +54,28 @@ public class CreateAccountRequest {
         this.credentials = credentials;
     }
 
+    public String getLocalise() {
+        return localise;
+    }
+
+    public void setLocalise(String localise) {
+        this.localise = localise;
+    }
+
     public class Params {
 
-        @SerializedName(value = "name")
-        private String name;
-
-        @SerializedName(value = "msisdn")
-        private String msisdn;
-
-        @SerializedName(value = "district_id")
-        private int districtId;
+        @SerializedName(value = "category")
+        private String farmingTipsCategory;
 
         public Params() {
         }
 
-        public String getMsisdn() {
-            return msisdn;
+        public String getFarmingTipsCategory() {
+            return farmingTipsCategory;
         }
 
-        public void setMsisdn(String msisdn) {
-            this.msisdn = msisdn;
-        }
-
-        public String getName() {
-            return name;
-        }
-
-        public void setName(String name) {
-            this.name = name;
-        }
-
-        public int getDistrictId() {
-            return districtId;
-        }
-
-        public void setDistrictId(int districtId) {
-            this.districtId = districtId;
+        public void setFarmingTipsCategory(String farmingTipsCategory) {
+            this.farmingTipsCategory = farmingTipsCategory;
         }
 
     }

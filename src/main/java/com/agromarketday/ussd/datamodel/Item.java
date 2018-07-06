@@ -13,20 +13,20 @@ import com.agromarketday.ussd.sharedInterface.MenuItem;
  */
 public class Item implements MenuItem {
     
-    private int id;
+    private String id;
     private String name;
 
-    public Item(int id, String name) {
+    public Item(String id, String name) {
         this.id = id;
         this.name = name;
     }
 
     @Override
-    public int getId() {
+    public String getId() {
         return id;
     }
 
-    public void setId(int id) {
+    public void setId(String id) {
         this.id = id;
     }
 
@@ -34,6 +34,11 @@ public class Item implements MenuItem {
     public String getName() {
         return name;
     }
+    
+    @Override
+        public int getCount() {
+            return -2;
+        }
 
     public void setName(String name) {
         this.name = name;

@@ -123,7 +123,8 @@ public final class CustomLogger {
      * @throws java.io.FileNotFoundException
      * @throws java.lang.Exception
      */
-    public static void configureLog4J(String log4jFile) throws FileNotFoundException, Exception {
+    public static void configureLog4J(String log4jFile) 
+            throws FileNotFoundException, Exception {
 
         System.out.println("configureLog4J Called, yay!");
 
@@ -151,7 +152,8 @@ public final class CustomLogger {
      * @throws java.io.FileNotFoundException
      * @throws java.lang.Exception
      */
-    public static void configureLog4J(String log4jFile, String logDir) throws FileNotFoundException, Exception {
+    public static void configureLog4J(String log4jFile, String logDir) 
+            throws FileNotFoundException, Exception {
 
         System.out.println("configureLog4J Called, yay!");
 

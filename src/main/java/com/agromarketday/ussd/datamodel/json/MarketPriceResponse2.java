@@ -191,7 +191,7 @@ public class MarketPriceResponse2 {
 
             @SerializedName("id")
             @Expose
-            private int id;
+            private String id;
 
             @SerializedName("name")
             @Expose
@@ -217,11 +217,16 @@ public class MarketPriceResponse2 {
                 this.products = products;
             }
 
-            public int getId() {
+            public String getId() {
                 return id;
             }
 
-            public void setId(int id) {
+            @Override
+            public int getCount() {
+                return -2;
+            }
+
+            public void setId(String id) {
                 this.id = id;
             }
 
@@ -229,7 +234,7 @@ public class MarketPriceResponse2 {
 
                 @SerializedName("id")
                 @Expose
-                private int id;
+                private String id;
 
                 @SerializedName("name")
                 @Expose
@@ -239,11 +244,11 @@ public class MarketPriceResponse2 {
                 @Expose
                 private Set<Market> markets = new HashSet<>();
 
-                public int getId() {
+                public String getId() {
                     return id;
                 }
 
-                public void setId(int id) {
+                public void setId(String id) {
                     this.id = id;
                 }
 
@@ -267,7 +272,7 @@ public class MarketPriceResponse2 {
 
                     @SerializedName("id")
                     @Expose
-                    private int id;
+                    private String id;
 
                     @SerializedName("name")
                     @Expose
@@ -276,11 +281,16 @@ public class MarketPriceResponse2 {
                     @SerializedName("prices")
                     private Set<Price> prices = new HashSet<>();
 
-                    public int getId() {
+                    public String getId() {
                         return id;
                     }
 
-                    public void setId(int id) {
+                    @Override
+                    public int getCount() {
+                        return -2;
+                    }
+
+                    public void setId(String id) {
                         this.id = id;
                     }
 
@@ -339,15 +349,25 @@ public class MarketPriceResponse2 {
                         }
 
                         @Override
-                        public int getId() {
-                            return 0;
+                        public String getId() {
+                            return "0";
                         }
 
                         @Override
                         public String getName() {
                             return itemName + " - " + price + "/" + measureUnit;
                         }
+
+                        @Override
+                        public int getCount() {
+                            return -2;
+                        }
                     }
+                }
+
+                @Override
+                public int getCount() {
+                    return -2;
                 }
             }
         }

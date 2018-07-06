@@ -15,6 +15,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -39,6 +40,7 @@ import org.hibernate.criterion.Property;
 import org.hibernate.criterion.Restrictions;
 import org.hibernate.query.Query;
 import org.joda.time.LocalDate;
+import org.joda.time.LocalDateTime;
 
 /**
  *
@@ -476,7 +478,7 @@ public final class CustomHibernate {
 
         String queryString = "";
         String errorDetails = "";
-        Set<BaseEntity> results = new HashSet<>();
+        Set<BaseEntity> results = new LinkedHashSet<>();
         boolean isError = Boolean.TRUE;
 
         try {
@@ -578,6 +580,26 @@ public final class CustomHibernate {
                             displayDates.add(date);
                         }
                         query.setParameterList(name, displayDates);
+                        break;
+
+                    case "startDate":
+                        Set<LocalDateTime> startDates = new HashSet<>();
+                        for (Object object : values) {
+
+                            LocalDateTime date = new LocalDateTime(object);
+                            startDates.add(date);
+                        }
+                        query.setParameterList(name, startDates);
+                        break;
+
+                    case "endDate":
+                        Set<LocalDateTime> endDates = new HashSet<>();
+                        for (Object object : values) {
+
+                            LocalDateTime date = new LocalDateTime(object);
+                            endDates.add(date);
+                        }
+                        query.setParameterList(name, endDates);
                         break;
 
                     case "id":

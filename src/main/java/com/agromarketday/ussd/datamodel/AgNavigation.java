@@ -60,14 +60,19 @@ public class AgNavigation extends BaseEntity implements Auditable, Serializable 
             = "SELECT DISTINCT navig FROM AgNavigation navig INNER JOIN "
             + "navig.client client where client.msisdn=:msisdn";
 
-    public static final String FETCH_NAVIG_BY_MSISDN = "FETCH_NAVIG_BY_MSISDN";
-
     public static final String FETCH_NAVIG_BY_SESSIONID_QUERY
             = "SELECT DISTINCT navig FROM AgNavigation navig INNER JOIN "
             + "navig.client client where navig.sessionId=:sessionId";
 
+    public static final String FETCH_NAVIG_BY_MSISDN = "FETCH_NAVIG_BY_MSISDN";
+
     public static final String FETCH_NAVIG_BY_SESSIONID
             = "FETCH_NAVIG_BY_MSISDN_SESSIONID";
+
+    public static final String FETCH_NAVIG_BY_MSISDN_DATES
+            = "FETCH_NAVIG_BY_MSISDN_DATES";
+
+    public static final String FETCH_NAVIG_BY_DATES = "FETCH_NAVIG_BY_DATES";
 
     private static final long serialVersionUID = -712432774470329834L;
 
@@ -96,6 +101,12 @@ public class AgNavigation extends BaseEntity implements Auditable, Serializable 
     @Column(name = "market_info", columnDefinition = "text")
     private String allMarketInfo;
 
+    @Column(name = "district_info", columnDefinition = "text")
+    private String allDistrictInfo;
+
+    @Column(name = "districts_nav", columnDefinition = "text")
+    private String districtsNav;
+
     @Column(name = "district_markets", columnDefinition = "text")
     private String districtMarketsNav;
 
@@ -105,24 +116,35 @@ public class AgNavigation extends BaseEntity implements Auditable, Serializable 
     @Column(name = "market_prices", columnDefinition = "text")
     private String marketPriceNav;
 
-    @Column(name = "sellers_info", columnDefinition = "text")
-    private String allSellersInfo;
+    @Column(name = "buyer_seller_info", columnDefinition = "text")
+    private String allBuyerSellerInfo;
 
-    @Column(name = "district_sellers", columnDefinition = "text")
-    private String districtSellersNav;
+    @Column(name = "district_buyer_sellers", columnDefinition = "text")
+    private String districtBuyerSellerNav;
 
-    @Column(name = "sellers", columnDefinition = "text")
-    private String sellersNav;
-    
-    
+    @Column(name = "buyer_sellers", columnDefinition = "text")
+    private String buyerSellerNav;
+
     @Column(name = "buyers_info", columnDefinition = "text")
     private String allBuyersInfo;
 
     @Column(name = "matched_products", columnDefinition = "text")
     private String matchedProductsNav;
-    
+
     @Column(name = "matched_buyers", columnDefinition = "text")
     private String matchedBuyersNav;
+
+    @Column(name = "farming_tips", columnDefinition = "text")
+    private String allFarmingTips;
+
+    @Column(name = "tips_nav", columnDefinition = "text")
+    private String farmingTipsNav;
+
+    @Column(name = "topics_nav", columnDefinition = "text")
+    private String farmingTopicsNav;
+
+    @Column(name = "chapters_nav", columnDefinition = "text")
+    private String farmingChaptersNav;
 
     @Expose
     @SerializedName(value = "msisdn")
@@ -223,8 +245,6 @@ public class AgNavigation extends BaseEntity implements Auditable, Serializable 
     public void setMarketPriceNav(String marketPriceNav) {
         this.marketPriceNav = marketPriceNav;
     }
-    
-    
 
     @Override
     public String getUsername() {
@@ -257,28 +277,28 @@ public class AgNavigation extends BaseEntity implements Auditable, Serializable 
         return Objects.equals(this.client, other.getClient());
     }
 
-    public String getAllSellersInfo() {
-        return allSellersInfo;
+    public String getAllBuyerSellerInfo() {
+        return allBuyerSellerInfo;
     }
 
-    public void setAllSellersInfo(String allSellersInfo) {
-        this.allSellersInfo = allSellersInfo;
+    public void setAllBuyerSellerInfo(String allBuyerSellerInfo) {
+        this.allBuyerSellerInfo = allBuyerSellerInfo;
     }
 
-    public String getDistrictSellersNav() {
-        return districtSellersNav;
+    public String getDistrictBuyerSellerNav() {
+        return districtBuyerSellerNav;
     }
 
-    public void setDistrictSellersNav(String districtSellersNav) {
-        this.districtSellersNav = districtSellersNav;
+    public void setDistrictBuyerSellerNav(String districtBuyerSellerNav) {
+        this.districtBuyerSellerNav = districtBuyerSellerNav;
     }
 
-    public String getSellersNav() {
-        return sellersNav;
+    public String getBuyerSellerNav() {
+        return buyerSellerNav;
     }
 
-    public void setSellersNav(String sellersNav) {
-        this.sellersNav = sellersNav;
+    public void setBuyerSellerNav(String buyerSellerNav) {
+        this.buyerSellerNav = buyerSellerNav;
     }
 
     public String getAllBuyersInfo() {
@@ -303,6 +323,54 @@ public class AgNavigation extends BaseEntity implements Auditable, Serializable 
 
     public void setMatchedBuyersNav(String matchedBuyersNav) {
         this.matchedBuyersNav = matchedBuyersNav;
+    }
+
+    public String getAllFarmingTips() {
+        return allFarmingTips;
+    }
+
+    public void setAllFarmingTips(String allFarmingTips) {
+        this.allFarmingTips = allFarmingTips;
+    }
+
+    public String getFarmingTipsNav() {
+        return farmingTipsNav;
+    }
+
+    public void setFarmingTipsNav(String farmingTipsNav) {
+        this.farmingTipsNav = farmingTipsNav;
+    }
+
+    public String getFarmingTopicsNav() {
+        return farmingTopicsNav;
+    }
+
+    public void setFarmingTopicsNav(String farmingTopicsNav) {
+        this.farmingTopicsNav = farmingTopicsNav;
+    }
+
+    public String getFarmingChaptersNav() {
+        return farmingChaptersNav;
+    }
+
+    public void setFarmingChaptersNav(String farmingChaptersNav) {
+        this.farmingChaptersNav = farmingChaptersNav;
+    }
+
+    public String getAllDistrictInfo() {
+        return allDistrictInfo;
+    }
+
+    public void setAllDistrictInfo(String allDistrictInfo) {
+        this.allDistrictInfo = allDistrictInfo;
+    }
+
+    public String getDistrictsNav() {
+        return districtsNav;
+    }
+
+    public void setDistrictsNav(String districtsNav) {
+        this.districtsNav = districtsNav;
     }
 
 }

@@ -4,12 +4,7 @@ package com.agromarketday.ussd.sharedInterface;
  *
  * @author smallgod
  */
-public interface MenuItem {
+public interface HasCount {
 
-    public String getId();
-
-    public String getName();
-    
     public int getCount();
-
 }

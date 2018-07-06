@@ -1,28 +1,33 @@
 package com.agromarketday.ussd.datamodel.json;
 
+import com.google.gson.annotations.Expose;
 import com.google.gson.annotations.SerializedName;
 
-public class CheckAccountRequest {
+public class GetDistrictRequest {
 
     /*
-        {
-            "method": "ACCOUNT_EXISTS",
-            "localise":"english",
-            "credentials": {
-              "app_id": "ADER6864g25644777",
-              "api_password": "sLA84009rw2",
-              "token_id": "y0lhfdety90jfdsa223sxbrj9" //this is like a session id
-            },
-            "params": {
-              "msisdn": 256774983602
-            }
-        }
-     */
-    @SerializedName(value = "localise")
-    private String localise;
+    
 
+//////// GET_DISTRICTS ////////////////////
+
+{
+    "method": "GET_DISTRICTS",
+    "localise":"english",
+    "credentials": {
+        "app_id": "ADER6864g25644777",//u may ignore this
+        "api_password": "sLA84009rw2",//u may ignore this
+        "token_id": "84938urj9338203u349393" //u may ignore this
+    },
+    "params": {
+        "region_id":43 // mandatory
+    }
+} 
+     */
     @SerializedName(value = "method")
     private String methodName;
+
+    @SerializedName(value = "localise")
+    private String localise;
 
     @SerializedName(value = "credentials")
     private Credentials credentials;
@@ -64,20 +69,20 @@ public class CheckAccountRequest {
 
     public class Params {
 
-        @SerializedName(value = "msisdn")
-        private String msisdn;
+        @SerializedName("region_id")
+        @Expose
+        private int regionId;
 
         public Params() {
         }
 
-        public String getMsisdn() {
-            return msisdn;
+        public int getRegionId() {
+            return regionId;
         }
 
-        public void setMsisdn(String msisdn) {
-            this.msisdn = msisdn;
+        public void setRegionId(int regionId) {
+            this.regionId = regionId;
         }
 
     }
-
 }

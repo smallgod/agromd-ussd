@@ -9,7 +9,7 @@ import java.util.Set;
 public interface HasChildrenItems extends MenuItem {
 
     @Override
-    public int getId();
+    public String getId();
 
     @Override
     public String getName();
@@ -19,5 +19,4 @@ public interface HasChildrenItems extends MenuItem {
 
     public Set<? extends MenuItem> getChildrenItems();
     
-
 }

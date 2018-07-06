@@ -7,6 +7,7 @@ import java.util.concurrent.TimeUnit;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.joda.time.Days;
+import org.joda.time.DurationFieldType;
 import org.joda.time.LocalDate;
 import org.joda.time.LocalDateTime;
 import org.joda.time.LocalTime;
@@ -87,6 +88,28 @@ public class DateUtils {
 
         DateTimeZone desiredTimeZone = DateTimeZone.forID(NamedConstants.KAMPALA_TIME_ZONE);
         return LocalDateTime.now(desiredTimeZone);
+    }
+    
+    public static LocalDateTime getEndOfThisDay(LocalDateTime date) {
+
+        LocalDateTime dt = date.withTime(23,59,59,0);
+
+        logger.debug("LocalDateTime converted: " + dt.toString());
+        return dt;
+    }
+
+    /**
+     * Convert DateTime to LocalDateTime
+     *
+     * @param date
+     * @return
+     */
+    public static LocalDateTime convertLocalDateToLocalDateTime(LocalDate date) {
+
+        LocalDateTime dt = date.toLocalDateTime(LocalTime.MIDNIGHT);
+
+        logger.debug("LocalDateTime converted: " + dt.toString());
+        return dt;
     }
 
     /**
@@ -432,11 +455,61 @@ public class DateUtils {
      * @param endDate
      * @return
      */
-    public static int getHoursTakenBetweenTwoDates(LocalDateTime startDate, LocalDateTime endDate) {
+    public static int getHoursTakenBetweenTwoDates(
+            LocalDateTime startDate,
+            LocalDateTime endDate) {
 
         Period period = new Period(startDate, endDate);
         return period.getHours();
 
+    }
+
+    /**
+     *
+     * @param startDate
+     * @param endDate
+     * @param timeUnit
+     * @return
+     */
+    public static int getTimeTakenBetweenTwoDates(
+            LocalDateTime startDate,
+            LocalDateTime endDate,
+            TimeUnit timeUnit) {
+
+        Period period = new Period(startDate, endDate);
+
+        int duration;
+        switch (timeUnit) {
+
+            case DAYS:
+                duration = period.getDays();
+                break;
+
+            case HOURS:
+                duration = period.getHours();
+                break;
+
+            case MINUTES:
+                duration = period.getMinutes();
+                break;
+
+            case SECONDS:
+                duration = period.getSeconds();
+                break;
+
+            case MILLISECONDS:
+                duration = period.getMillis();
+                break;
+
+            default:
+                logger.warn("Unknown TimeUnit: " + timeUnit.toString()
+                        + " - defaulting to length in seconds");
+
+                duration = period.getSeconds();
+                break;
+
+        }
+        return duration;
     }
 
     /**

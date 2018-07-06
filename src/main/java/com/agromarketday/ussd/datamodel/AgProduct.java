@@ -1,6 +1,7 @@
 package com.agromarketday.ussd.datamodel;
 
-import com.agromarketday.ussd.constant.BuyerLocation;
+import com.agromarketday.ussd.constant.ItemLocation;
+import com.agromarketday.ussd.constant.FarmingTipsCategories;
 import com.agromarketday.ussd.constant.ItemTag;
 import com.agromarketday.ussd.constant.Region;
 import com.agromarketday.ussd.constant.TransportArea;
@@ -85,13 +86,13 @@ public class AgProduct extends BaseEntity implements Auditable, Serializable {
     private String itemDescription;
 
     @Column(name = "buyer_id")
-    private int buyerId;
+    private String buyerId;
 
     @Column(name = "buyer_name")
     private String buyerName;
 
     @Column(name = "seller_id")
-    private int sellerId;
+    private String sellerId;
 
     @Column(name = "seller_name")
     private String sellerName; // in case of contacting sellers
@@ -136,7 +137,7 @@ public class AgProduct extends BaseEntity implements Auditable, Serializable {
     private String place;
 
     @Column(name = "payment_method")
-    private String paymentMethod;
+    private int paymentMethod;
 
     @Column(name = "is_submitted")
     private boolean isSubmitted;
@@ -151,10 +152,28 @@ public class AgProduct extends BaseEntity implements Auditable, Serializable {
     private UssdFunction ussdFunction;
 
     @Expose
-    @SerializedName(value = "buyer_location")
-    @Column(name = "buyer_location")
+    @SerializedName(value = "item_location")
+    @Column(name = "item_location")
     @Enumerated(EnumType.STRING)
-    private BuyerLocation buyerLocation;
+    private ItemLocation itemLocation;
+
+    @Expose
+    @SerializedName(value = "farming_tips_category")
+    @Column(name = "farming_tips_category")
+    @Enumerated(EnumType.STRING)
+    private FarmingTipsCategories farmingTipsCategory;
+
+    @Column(name = "farming_tip_category_id")
+    private int farmingTipCategoryId;
+
+    @Column(name = "farming_tip_topic_id")
+    private int farmingTipTopicId;
+
+    @Column(name = "farming_tip_chapter_id")
+    private int farmingTipChapterId;
+    
+    @Column(name = "consider_count")
+    private boolean isConsiderCount;
 
     public AgProduct() {
     }
@@ -175,11 +194,11 @@ public class AgProduct extends BaseEntity implements Auditable, Serializable {
         this.userContact = userContact;
     }
 
-    public int getBuyerId() {
+    public String getBuyerId() {
         return buyerId;
     }
 
-    public void setBuyerId(int buyerId) {
+    public void setBuyerId(String buyerId) {
         this.buyerId = buyerId;
     }
 
@@ -191,11 +210,11 @@ public class AgProduct extends BaseEntity implements Auditable, Serializable {
         this.isSubmitted = isSubmitted;
     }
 
-    public String getPaymentMethod() {
+    public int getPaymentMethod() {
         return paymentMethod;
     }
 
-    public void setPaymentMethod(String paymentMethod) {
+    public void setPaymentMethod(int paymentMethod) {
         this.paymentMethod = paymentMethod;
     }
 
@@ -370,11 +389,11 @@ public class AgProduct extends BaseEntity implements Auditable, Serializable {
         this.marketName = marketName;
     }
 
-    public int getSellerId() {
+    public String getSellerId() {
         return sellerId;
     }
 
-    public void setSellerId(int sellerId) {
+    public void setSellerId(String sellerId) {
         this.sellerId = sellerId;
     }
 
@@ -402,12 +421,12 @@ public class AgProduct extends BaseEntity implements Auditable, Serializable {
         this.isMatched = isMatched;
     }
 
-    public BuyerLocation getBuyerLocation() {
-        return buyerLocation;
+    public ItemLocation getItemLocation() {
+        return itemLocation;
     }
 
-    public void setBuyerLocation(BuyerLocation buyerLocation) {
-        this.buyerLocation = buyerLocation;
+    public void setItemLocation(ItemLocation itemLocation) {
+        this.itemLocation = itemLocation;
     }
 
     public int getProductId() {
@@ -418,4 +437,43 @@ public class AgProduct extends BaseEntity implements Auditable, Serializable {
         this.productId = productId;
     }
 
+    public FarmingTipsCategories getFarmingTipsCategory() {
+        return farmingTipsCategory;
+    }
+
+    public void setFarmingTipsCategory(FarmingTipsCategories farmingTipsCategory) {
+        this.farmingTipsCategory = farmingTipsCategory;
+    }
+
+    public int getFarmingTipCategoryId() {
+        return farmingTipCategoryId;
+    }
+
+    public void setFarmingTipCategoryId(int farmingTipCategoryId) {
+        this.farmingTipCategoryId = farmingTipCategoryId;
+    }
+
+    public int getFarmingTipTopicId() {
+        return farmingTipTopicId;
+    }
+
+    public void setFarmingTipTopicId(int farmingTipTopicId) {
+        this.farmingTipTopicId = farmingTipTopicId;
+    }
+
+    public int getFarmingTipChapterId() {
+        return farmingTipChapterId;
+    }
+
+    public void setFarmingTipChapterId(int farmingTipChapterId) {
+        this.farmingTipChapterId = farmingTipChapterId;
+    }
+
+    public boolean isIsConsiderCount() {
+        return isConsiderCount;
+    }
+
+    public void setIsConsiderCount(boolean isConsiderCount) {
+        this.isConsiderCount = isConsiderCount;
+    }
 }

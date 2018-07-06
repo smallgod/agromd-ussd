@@ -10,15 +10,17 @@ import com.agromarketday.ussd.util.GeneralUtils;
  */
 public enum APIMethodName implements Constants {
 
+    GET_STATS("GET_STATS"),
+    FARMING_TIPS("FARMING_TIPS"),
     GET_BUYERS("GET_BUYERS"),
     GET_SELLERS("GET_SELLERS"),
     ACCOUNT_EXISTS("ACCOUNT_EXISTS"),
     CREATE_ACCOUNT("CREATE_ACCOUNT"),
     GET_CATEGORIES("GET_CATEGORIES"),
+    GET_DISTRICTS("GET_DISTRICTS"),
     GET_MARKET_PRICES("GET_MARKET_PRICES"),
     UPLOAD_ITEM_FOR_SALE("UPLOAD_ITEM_FOR_SALE"),
-    CONTACT_BUYER("CONTACT_BUYER"),
-    CONTACT_SELLER("CONTACT_SELLER");
+    CONTACT("CONTACT");
 
     private final String methodNameString;
 

@@ -20,7 +20,8 @@ public class GetCategoryRequest {
     "params": {
         "category_id": 123, //can be -1 (empty)
         "sub_category_id": -1, //can be -1 (empty)
-        "category_class":"produce" //PRODUCE || INPUT
+        "category_class":"produce", //PRODUCE || INPUT
+        "function":"MATCHED_BUYERS"
     }
 }
     
@@ -82,6 +83,14 @@ public class GetCategoryRequest {
         @SerializedName("category_class")
         @Expose
         private String categoryClass;
+        
+        @SerializedName("function")
+        @Expose
+        private String function;
+        
+        @SerializedName("msisdn")
+        @Expose
+        private String msisdn;
 
         public Params() {
 
@@ -109,6 +118,22 @@ public class GetCategoryRequest {
 
         public void setSubCategoryId(int subCategoryId) {
             this.subCategoryId = subCategoryId;
+        }
+
+        public String getFunction() {
+            return function;
+        }
+
+        public void setFunction(String function) {
+            this.function = function;
+        }
+
+        public String getMsisdn() {
+            return msisdn;
+        }
+
+        public void setMsisdn(String msisdn) {
+            this.msisdn = msisdn;
         }
 
     }

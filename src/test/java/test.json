@@ -1,1 +1,166 @@
-{}
+{
+    "project_id": "UU838938",
+    "project_name": "INCREASING THE LITERACY LEVELS IN KARAMOJA",
+    "project_goal": "Our goal for the project is to..",
+    "start_date": "2018-02-09",
+    "end_date": "2019-03-31",
+    "components": [
+        {
+            "serial": 1,
+            "text": "PROJECT MANAGEMENT, POLICY, REGULATORY AND ICT FUNCTIONS OF MAAIF",
+            "sub-components": [
+                {
+                    "serial": 1,
+                    "text": "Project Management and Coordination at National, Cluster and District Level",
+                    "outputs": [
+                        {
+                            "serial": 1,
+                            "text": "first output",
+                            "activities": [
+                                {
+                                    "serial": 1,
+                                    "text": "Develop methodology for estimating xxx",
+                                    "MTEF Code": "MC584",
+                                    "budget": 189900000,
+                                    "measure_unit": [
+                                        {
+                                            "name": "Consultancy",
+                                            "unit_cost": 120000,
+                                            "unit_count": 1,
+                                            "responsibility": "Tom Edgars"
+                                        },
+                                        {
+                                            "name": " Trainings conducted",
+                                            "unit_cost": 389000,
+                                            "unit_count": 4,
+                                            "responsibility": "Arthur Davies"
+                                        }
+
+                                    ],
+                                    "planning_periods": [
+                                        {
+                                            "period": 1,
+                                            "header": "Quarter 1 (Q1)",
+                                            "plan": "Develop methodology for estimating crop production",
+                                            "revised_plan": "",
+                                            "budget": 1200000,
+                                            "expenditure": 40000,
+                                            "performance": {
+                                                "work_done": 0,
+                                                "budget_spent": 3,
+                                                "cummulative_work_done": 0,
+                                                "cummulative_budget_spent": 3,
+                                                "variance_reasons": [
+                                                    {
+                                                        "id": 1,
+                                                        "reason": "Late release of funds"
+                                                    },
+                                                    {
+                                                        "id": 2,
+                                                        "reason": "Delayed schedule"
+                                                    }
+
+                                                ]
+
+                                            }
+                                        },
+                                        {
+                                            "period": 2,
+                                            "header": "Quarter 2 (Q2)",
+                                            "plan": "Plan for activity 1 for Quarter 2",
+                                            "revised_plan": "This is the revised plan for activity 1 for Q2",
+                                            "budget": 1200000,
+                                            "expenditure": 40000,
+                                            "performance": {
+                                                "work_done": 2,
+                                                "budget_spent": 3,
+                                                "cummulative_work_done": 2,
+                                                "cummulative_budget_spent": 6,
+                                                "variance_reasons": [
+                                                    {
+                                                        "id": 1,
+                                                        "reason": "Late release of funds 2"
+                                                    },
+                                                    {
+                                                        "id": 2,
+                                                        "reason": "Another variance reason"
+                                                    }
+
+                                                ]
+
+                                            }
+                                        }
+                                    ]
+                                },
+                                {
+                                    "serial": 2,
+                                    "text": "Develop tools for collecting xxx",
+                                    "MTEF Code": "MC943"
+                                }
+
+                            ]
+                        },
+                        {
+                            "serial": 2,
+                            "text": "second output"
+                        }
+                    ]
+                }
+            ]
+        }
+    ],
+    "meta_data": [
+        {
+            "name": "component_num",
+            "value": "Component #"
+        },
+        {
+            "name": "component_name",
+            "value": "Component"
+        },
+        {
+            "name": "subcomponent_num",
+            "value": "Sub Component #"
+        },
+        {
+            "name": "output_num",
+            "value": "Output #"
+        },
+        {
+            "name": "output_name",
+            "value": "Output"
+        },
+        {
+            "name": "activity_num",
+            "value": "Key Activity #"
+        },
+        {
+            "name": "activity_name",
+            "value": "Key Activity"
+        },
+        {
+            "name": "mtf_code",
+            "value": "MTF Code"
+        },
+        {
+            "name": "measure_unit",
+            "value": " Unit of Measure (of activity)"
+        },
+        {
+            "name": "unit_cost",
+            "value": "Cost of Unit ('000) "
+        },
+        {
+            "name": "unit_number",
+            "value": "Number of Units"
+        },
+        {
+            "name": "responsibility",
+            "value": "Responsibility (for activity)"
+        },
+        {
+            "name": "total_budget",
+            "value": " Total Budget ('000) "
+        }
+    ]
+}

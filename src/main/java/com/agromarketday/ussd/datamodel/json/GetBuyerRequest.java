@@ -10,7 +10,7 @@ public class GetBuyerRequest {
 //////// GET BUYERS Request ////////////////////
 
 {
-    "method": "GET_BUYERS",
+    "method": "GET_SELLERS", //GET_BUYERS
     "localise":"english",
     "credentials": {
         "app_id": "ADER6864g25644777",//u may ignore this
@@ -18,15 +18,13 @@ public class GetBuyerRequest {
         "token_id": "84938urj9338203u349393" //u may ignore this
     },
     "params": {
-        "customer_msisdn":"256785243798",
-        "category_id": 123, //can be -1 (empty)
-        "sub_category_id": -1, //can be -1 (empty)
-        "category_class":"produce",
-        "transport":"", //NATIONAL | INTERNATIONAL | ANY
-        "district":"",
-        "region":"",
-        "buyer":"",//such as - 256774983602
-        "matched_buyers":true
+        "category_id": 123, //mandatory - mandatory so that we can narrow down the return string - i think we should do for all data requests to have smaller JSON
+        "sub_category_id": 22, //mandatory
+        "category_class":"inputs",
+        "transport":"", //NATIONAL | ANY
+        "district_id":3, 
+        "region_id":99, 
+        "region":"CENTRAL" //mandatory -> WESTERN | EASTERN | 
     }
 }
     
@@ -97,6 +95,10 @@ public class GetBuyerRequest {
         @Expose
         private String transport;
 
+        @SerializedName("region_id")
+        @Expose
+        private int regionId;
+
         @SerializedName("region")
         @Expose
         private String region;
@@ -109,12 +111,8 @@ public class GetBuyerRequest {
         @Expose
         private String buyer;
 
-        @SerializedName("matched_buyers")
-        @Expose
-        private boolean matchedBuyers;
-
         public Params() {
-            this.matchedBuyers = Boolean.FALSE; //default
+
         }
 
         public String getBuyer() {
@@ -123,14 +121,6 @@ public class GetBuyerRequest {
 
         public void setBuyer(String buyer) {
             this.buyer = buyer;
-        }
-
-        public boolean isMatchedBuyers() {
-            return matchedBuyers;
-        }
-
-        public void setMatchedBuyers(boolean matchedBuyers) {
-            this.matchedBuyers = matchedBuyers;
         }
 
         public int getCategoryId() {
@@ -187,6 +177,14 @@ public class GetBuyerRequest {
 
         public void setDistrict(String district) {
             this.district = district;
+        }
+
+        public int getRegionId() {
+            return regionId;
+        }
+
+        public void setRegionId(int regionId) {
+            this.regionId = regionId;
         }
     }
 }

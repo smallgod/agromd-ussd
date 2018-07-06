@@ -17,93 +17,25 @@ public class MarketPriceResponse {
         "success": true,
         "data": [
             {
-                "district_id":34,
-                "district_name": "Kampala",
+                "district_id": 4,
+                "district_name": "Mbale",
                 "default_product": {
-                    "id":1,
-                    "name": "Dried tilapia",
-                    "price": 6300,
-                    "measure_unit": "KG"
-                }
-            },
-            {
-                "district_id":35,
-                "district_name": "Mukono",
-                "default_product": {
-                    "id":2,
-                    "name": "Mukene",
-                    "price": 2500,
-                    "measure_unit": "KG"
-                }
-            },
-            {
-                "district_id":36,
-                "district_name": "Kumi",
-                "default_product": {
-                    "id":3,
-                    "name": "Mukene",
-                    "price": 2800,
-                    "measure_unit": "KG"
-                }
-            },
-            {
-                "district_id":37,
-                "district_name": "Gulu",
-                "default_product": {
-                    "id":4,
-                    "name": "Fresh tilapia",
-                    "price": 5400,
-                    "measure_unit": "whole"
-                }
-            },
-            {
-                "district_id":38,
-                "district_name": "Kabale",
-                "default_product": {
-                    "id":6,
-                    "name": "Dried tilapia",
-                    "price": 6300,
-                    "measure_unit": "KG"
-                }
-            },
-            {
-                "district_id":39,
-                "district_name": "Kiboga",
-                "default_product": {
-                    "id":7,
-                    "name": "Mukene",
-                    "price": 2500,
-                    "measure_unit": "KG"
-                }
-            },
-            {
-                "district_id":40,
-                "district_name": "Nakapiripirit",
-                "default_product": {
-                    "id":8,
-                    "name": "Nkejje",
-                    "price": 3800,
-                    "measure_unit": "KG"
-                }
-            },
-            {
-                "district_id":41,
-                "district_name": "Soroti",
-                "default_product": {
-                    "id":9,
-                    "name": "Fresh tilapia",
-                    "price": 4400,
-                    "measure_unit": "whole"
-                }
-            },
-            {
-                "district_id":42,
-                "district_name": "Masaka",
-                "default_product": {
-                    "id":10,
+                    "id": 396,
                     "name": "Tilapia",
-                    "price": 4300,
-                    "measure_unit": "Kg"
+                    "price": "Ugx 13,000/=",
+                    "measure_unit": "kg",
+                    "market": "Mbale Central Market"
+                }
+            }, 
+            {
+                "district_id": 12,
+                "district_name": "Iganga",
+                "default_product": {
+                    "id": 427,
+                    "name": "Tilapia",
+                    "price": "Ugx 12,000/=",
+                    "measure_unit": "kg",
+                    "market": "Iganga Main Market"
                 }
             }
         ]
@@ -145,7 +77,7 @@ public class MarketPriceResponse {
 
         @SerializedName("district_id")
         @Expose
-        private int id;
+        private String id;
 
         @SerializedName("district_name")
         @Expose
@@ -171,11 +103,11 @@ public class MarketPriceResponse {
             this.defaultProduct = defaultProduct;
         }
 
-        public int getId() {
+        public String getId() {
             return id;
         }
 
-        public void setId(int id) {
+        public void setId(String id) {
             this.id = id;
         }
 
@@ -183,9 +115,14 @@ public class MarketPriceResponse {
         public String getName() {
             // e.g. Kampala - Dried fish - 25,000/Kg
             return this.districtName + " -" + this.getDefaultProduct().getName()
-                    + " -" + this.getDefaultProduct().getPrice()
+                    + " -" + this.getDefaultProduct().getPrice().split("/")[0] // to remove '/='
                     + "/" + this.getDefaultProduct().getMeasureUnit();
             //return name;
+        }
+
+        @Override
+        public int getCount() {
+            return -2;
         }
 
         public class Product {
@@ -200,17 +137,21 @@ public class MarketPriceResponse {
 
             @SerializedName("price")
             @Expose
-            private int price;
+            private String price;
 
             @SerializedName("measure_unit")
             @Expose
             private String measureUnit;
 
-            public int getPrice() {
+            @SerializedName("market")
+            @Expose
+            private String marketName;
+
+            public String getPrice() {
                 return price;
             }
 
-            public void setPrice(int price) {
+            public void setPrice(String price) {
                 this.price = price;
             }
 
@@ -236,6 +177,14 @@ public class MarketPriceResponse {
 
             public String getName() {
                 return name;
+            }
+
+            public String getMarketName() {
+                return marketName;
+            }
+
+            public void setMarketName(String marketName) {
+                this.marketName = marketName;
             }
 
         }

@@ -11,6 +11,7 @@ import com.agromarketday.ussd.config.RemoteUnitConfig;
 import com.agromarketday.ussd.connect.HttpClientPool;
 import com.agromarketday.ussd.constant.APIContentType;
 import com.agromarketday.ussd.constant.NamedConstants;
+import com.agromarketday.ussd.controller.JsonAPIServer;
 import com.agromarketday.ussd.controller.JsonProcessor;
 import com.agromarketday.ussd.controller.XmlProcessor;
 import com.agromarketday.ussd.database.CustomHibernate;
@@ -57,6 +58,7 @@ public final class AppEntry implements Daemon, ServletContextListener {
     private CustomJettyServer jettyServer;
     private static XmlProcessor xmlProcessor;
     private static JsonProcessor jsonProcessor;
+     private static JsonAPIServer jsonApiServer;
 
     //@deprecated As of 2.4, use {@link MainMapLookup#setMainArguments(String[])} 
     @Override
@@ -106,6 +108,7 @@ public final class AppEntry implements Daemon, ServletContextListener {
             //jobScheduler = new CustomJobScheduler(clientPool, internalDbAdapter, externalDbAccessAdapter);
             xmlProcessor = new XmlProcessor(internalDbAdapter, clientPool, ussdMenuLoader, remoteUnitConfig, adCampaignProcessorConfig, adPaymentProcessorConfig, adDisplayProcessorConfig, taskExecutorService, jobScheduler);
             jsonProcessor = new JsonProcessor(internalDbAdapter, clientPool, ussdMenuLoader, remoteUnitConfig, adCampaignProcessorConfig, adPaymentProcessorConfig, adDisplayProcessorConfig, taskExecutorService, jobScheduler);
+            jsonApiServer = new JsonAPIServer(internalDbAdapter);
 
             //jobScheduler.scheduleARepeatJob(adCampaignProcessorConfig, adPaymentProcessorConfig, adDisplayProcessorConfig, AdCampaignProcessorJob.class, new AdCampaignProcessorJobListener(), NamedConstants.CAMPAIGN_JOB_SCHEDULE_START_DELAY);
         } catch (DaemonInitException | FileNotFoundException | UnsupportedEncodingException | SAXException | JAXBException | NullPointerException ex) {
@@ -255,6 +258,13 @@ public final class AppEntry implements Daemon, ServletContextListener {
             context.setAttribute(NamedConstants.USSD_SERVER_JSON_HANDLER, jsonProcessor);
         } else {
             System.err.println("ContextInitialised called, but JSON PROCESSOR is NULL, terminating");
+            System.exit(0);
+        }
+        
+        if (jsonApiServer != null) {
+            context.setAttribute(NamedConstants.JSON_API_SERVER_HANDLER, jsonApiServer);
+        } else {
+            System.err.println("ContextInitialised called, but JSON API server is NULL, terminating");
             System.exit(0);
         }
 

@@ -10,20 +10,21 @@ public class ContactRequest {
 //////// GET_SELLERS or Get_BUYERS Request ////////////////////
 
 {
-  "method": "CONTACT_BUYER",
+  "method": "CONTACT", //
   "localise": "english",
   "credentials": {
-        "app_id": "",
-        "api_password": "",
-        "token_id": ""
+    "app_id": "",
+    "api_password": "",
+    "token_id": ""
   },
   "params": {
     "customer_msisdn":"2567876577",
-    "contact_person_id": 23, //can be seller or buyer
+    "contact_person_id": "23", //can be seller or buyer or doctor etc
     "category_id": 23,
     "sub_category_id": 76,
     "product_id":45, //e.g. Mukene omusiike's ID
-    "category_class":"PRODUCE", //INPUT | VAP
+    "category_class":"inputs", //INPUT | VAP
+    "person_to_contact":"BUYER", //SELLER | DOCTOR | 
     "price":{
         "amount":4565,
         "measure_unit":"KG"
@@ -84,7 +85,7 @@ public class ContactRequest {
 
         @SerializedName("contact_person_id")
         @Expose
-        private int contactPersonId;
+        private String contactPersonId;
 
         @SerializedName("category_id")
         @Expose
@@ -102,6 +103,10 @@ public class ContactRequest {
         @Expose
         private String categoryClass;
 
+        @SerializedName("person_to_contact")
+        @Expose
+        private String personToContact;
+
         @SerializedName("price")
         @Expose
         private Price price;
@@ -109,11 +114,11 @@ public class ContactRequest {
         public Params() {
         }
 
-        public int getContactPersonId() {
+        public String getContactPersonId() {
             return contactPersonId;
         }
 
-        public void setContactPersonId(int contactPersonId) {
+        public void setContactPersonId(String contactPersonId) {
             this.contactPersonId = contactPersonId;
         }
 
@@ -163,6 +168,14 @@ public class ContactRequest {
 
         public void setCategoryClass(String categoryClass) {
             this.categoryClass = categoryClass;
+        }
+
+        public String getPersonToContact() {
+            return personToContact;
+        }
+
+        public void setPersonToContact(String personToContact) {
+            this.personToContact = personToContact;
         }
     }
 }

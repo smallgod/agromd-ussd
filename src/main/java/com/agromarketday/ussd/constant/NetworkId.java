@@ -8,20 +8,17 @@ import com.agromarketday.ussd.util.GeneralUtils;
  *
  * @author smallgod
  */
-public enum UssdFunction implements Constants {
+public enum NetworkId implements Constants {
 
-    FIND_BUYERS("FIND_BUYERS"),
-    MARKET_PRICES("MARKET_PRICES"),
-    INPUT_TOOLS("INPUT_TOOLS"),
-    FARMING_TIPS("FARMING_TIPS"),
-    MATCHED_BUYERS("MATCHED_BUYERS"),
-    SELLERS_TRADERS("SELLERS_TRADERS"),
-    UNKNOWN("UNKNOWN"), 
-    SELL("SELL");
+    MTN_UG("MTN_UG"),
+    AIRTEL_UG("AIRTEL_UG"),
+    AFRICELL_UG("AFRICELL_UG"),
+    UNKOWN("UNKOWN"),
+    UTL("UTL");
 
     private final String enumValue;
 
-    UssdFunction(String enumValue) {
+    NetworkId(String enumValue) {
         this.enumValue = enumValue;
     }
 
@@ -30,11 +27,11 @@ public enum UssdFunction implements Constants {
         return this.enumValue;
     }
 
-    public static UssdFunction convertToEnum(String value) throws MyCustomException {
+    public static NetworkId convertToEnum(String value) throws MyCustomException {
 
         if (value != null) {
 
-            for (UssdFunction availableValue : UssdFunction.values()) {
+            for (NetworkId availableValue : NetworkId.values()) {
 
                 if (value.equalsIgnoreCase(availableValue.getValue())) {
                     return availableValue;
@@ -43,7 +40,7 @@ public enum UssdFunction implements Constants {
         }
         MyCustomException error
                 = GeneralUtils.getSingleError(ErrorCode.NOT_SUPPORTED_ERR,
-                        "Unsupported function", "Failed to convert: "
+                        "Unsupported Network", "Failed to convert: "
                         + value + "to Enum");
         throw error;
     }

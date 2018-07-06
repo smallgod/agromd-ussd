@@ -11,7 +11,7 @@ import java.util.Set;
 public interface DistrictMarket extends MenuItem {
 
     @Override
-    public int getId();
+    public String getId();
 
     @Override
     public String getName();

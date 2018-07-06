@@ -102,6 +102,10 @@ public class MarketPriceRequest {
         @SerializedName("region")
         @Expose
         private String region;
+        
+         @SerializedName("region_id")
+        @Expose
+        private int regionId;
 
         public Params() {
         }
@@ -160,6 +164,14 @@ public class MarketPriceRequest {
 
         public void setCategoryClass(String categoryClass) {
             this.categoryClass = categoryClass;
+        }
+
+        public int getRegionId() {
+            return regionId;
+        }
+
+        public void setRegionId(int regionId) {
+            this.regionId = regionId;
         }
     }
 }

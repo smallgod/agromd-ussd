@@ -23,9 +23,11 @@ public class ItemUploadRequest {
         "transport":"NATIONAL", //NONE | INTERNATIONAL | ANY
         "item_name":"", //If selected OTHER cat or sub-cat
         "item_description":"Rice from Kibimba wetlands",
-        "payment_method":"MOMO",
+        "payment_method":1,
         "item_location":{
+            "region_id":4,
             "region":"WESTERN",
+            "district_id":45,
             "district":"Kampala",
             "place":"Kamudini"
         },
@@ -109,7 +111,7 @@ public class ItemUploadRequest {
         private String itemDescription;
 
         @SerializedName("payment_method")
-        private String paymentMethod;
+        private int paymentMethod;
 
         @SerializedName("transport_area")
         private String transportArea;
@@ -177,11 +179,11 @@ public class ItemUploadRequest {
             this.itemDescription = itemDescription;
         }
 
-        public String getPaymentMethod() {
+        public int getPaymentMethod() {
             return paymentMethod;
         }
 
-        public void setPaymentMethod(String paymentMethod) {
+        public void setPaymentMethod(int paymentMethod) {
             this.paymentMethod = paymentMethod;
         }
 
@@ -219,6 +221,10 @@ public class ItemUploadRequest {
 
         public class ItemLocation {
 
+            @SerializedName("region_id")
+            @Expose
+            private int regionId;
+
             @SerializedName("region")
             @Expose
             private String region;
@@ -226,6 +232,10 @@ public class ItemUploadRequest {
             @SerializedName("district")
             @Expose
             private String district;
+
+            @SerializedName("district_id")
+            @Expose
+            private int districtId;
 
             @SerializedName("place")
             @Expose
@@ -253,6 +263,22 @@ public class ItemUploadRequest {
 
             public void setPlace(String place) {
                 this.place = place;
+            }
+
+            public int getRegionId() {
+                return regionId;
+            }
+
+            public void setRegionId(int regionId) {
+                this.regionId = regionId;
+            }
+
+            public int getDistrictId() {
+                return districtId;
+            }
+
+            public void setDistrictId(int districtId) {
+                this.districtId = districtId;
             }
         }
 

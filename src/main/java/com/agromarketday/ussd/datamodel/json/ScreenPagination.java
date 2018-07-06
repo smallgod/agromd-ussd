@@ -100,7 +100,7 @@ public class ScreenPagination {
 
         @Expose
         @SerializedName("id")
-        private int id;
+        private String id;
 
         @Expose
         @SerializedName("name")
@@ -110,17 +110,22 @@ public class ScreenPagination {
         }
 
         @Override
-        public int getId() {
+        public String getId() {
             return id;
         }
 
-        public void setId(int id) {
+        public void setId(String id) {
             this.id = id;
         }
 
         @Override
         public String getName() {
             return name;
+        }
+        
+        @Override
+        public int getCount() {
+            return -2;
         }
 
         public void setName(String name) {

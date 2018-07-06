@@ -2,11 +2,11 @@ package com.agromarketday.ussd.datamodel.json;
 
 import com.google.gson.annotations.SerializedName;
 
-public class CreateAccountRequest {
+public class GetStatsRequest {
 
     /*
         {
-            "method": "CREATE_ACCOUNT",
+            "method": "GET_STATS",
             "localise": "english",
             "credentials": {
               "app_id": "",
@@ -14,13 +14,15 @@ public class CreateAccountRequest {
               "token_id": ""
             },
             "params": {
-              "name": "SmallG",
-              "districtId": "Kampala",//why should a user belong to a districtId/region ?? Commodities should but users dont have to!!
-              "msisdn": "256784725338"
+              "msisdn": "256774893602", //optional
+              "start_date":"2017-02-09",
+              "end_date":"2017-02-30"
             }
-          }
         }
      */
+    @SerializedName(value = "localise")
+    private String localise;
+
     @SerializedName(value = "method")
     private String methodName;
 
@@ -54,16 +56,24 @@ public class CreateAccountRequest {
         this.credentials = credentials;
     }
 
-    public class Params {
+    public String getLocalise() {
+        return localise;
+    }
 
-        @SerializedName(value = "name")
-        private String name;
+    public void setLocalise(String localise) {
+        this.localise = localise;
+    }
+
+    public class Params {
 
         @SerializedName(value = "msisdn")
         private String msisdn;
-
-        @SerializedName(value = "district_id")
-        private int districtId;
+        
+        @SerializedName(value = "start_date")
+        private String startDate;
+        
+        @SerializedName(value = "end_date")
+        private String endDate;
 
         public Params() {
         }
@@ -76,20 +86,20 @@ public class CreateAccountRequest {
             this.msisdn = msisdn;
         }
 
-        public String getName() {
-            return name;
+        public String getStartDate() {
+            return startDate;
         }
 
-        public void setName(String name) {
-            this.name = name;
+        public void setStartDate(String startDate) {
+            this.startDate = startDate;
         }
 
-        public int getDistrictId() {
-            return districtId;
+        public String getEndDate() {
+            return endDate;
         }
 
-        public void setDistrictId(int districtId) {
-            this.districtId = districtId;
+        public void setEndDate(String endDate) {
+            this.endDate = endDate;
         }
 
     }

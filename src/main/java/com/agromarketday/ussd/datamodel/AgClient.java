@@ -71,6 +71,9 @@ public class AgClient extends BaseEntity implements Auditable, Serializable {
 
     @Column(name = "district")
     private String district;
+    
+     @Column(name = "district_id")
+    private int districtId;
 
     @Column(name = "is_registered")
     private boolean isRegistered;
@@ -172,6 +175,14 @@ public class AgClient extends BaseEntity implements Auditable, Serializable {
 
     public void setDistrict(String district) {
         this.district = district;
+    }
+
+    public int getDistrictId() {
+        return districtId;
+    }
+
+    public void setDistrictId(int districtId) {
+        this.districtId = districtId;
     }
 
 }

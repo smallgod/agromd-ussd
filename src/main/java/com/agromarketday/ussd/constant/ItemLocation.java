@@ -8,16 +8,16 @@ import com.agromarketday.ussd.util.GeneralUtils;
  *
  * @author smallgod
  */
-public enum BuyerLocation implements Constants {
+public enum ItemLocation implements Constants {
 
-    NATIONAL("NATIONAL"),
-    INTERNATIONAL("INTERNATIONAL"),
-    NEARBY("NEARBY"),
+    NATIONAL("National"),
+    INTERNATIONAL("International"),
+    NEARBY("Nearby"),
     UNKNOWN("UNKNOWN");
 
     private final String enumValue;
 
-    BuyerLocation(String enumValue) {
+    ItemLocation(String enumValue) {
         this.enumValue = enumValue;
     }
 
@@ -26,11 +26,11 @@ public enum BuyerLocation implements Constants {
         return this.enumValue;
     }
 
-    public static BuyerLocation convertToEnum(String value) throws MyCustomException {
+    public static ItemLocation convertToEnum(String value) throws MyCustomException {
 
         if (value != null) {
 
-            for (BuyerLocation availableValue : BuyerLocation.values()) {
+            for (ItemLocation availableValue : ItemLocation.values()) {
 
                 if (value.equalsIgnoreCase(availableValue.getValue())) {
                     return availableValue;

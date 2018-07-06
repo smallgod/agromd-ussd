@@ -11,6 +11,7 @@ import com.agromarketday.ussd.util.GeneralUtils;
 public enum MenuType implements Constants {
 
     SELECT_STATIC_MENU("SELECT_STATIC_MENU"), //Whether menu is for selecting an item or typing in
+    SELECT_STATIC_DYNAMIC_MENU("SELECT_STATIC_DYNAMIC_MENU"), //A static menu that has some dynamic content e.g. count (3)
     SELECT_DYNAMIC_MENU("SELECT_DYNAMIC_MENU"),
     INPUT_MENU("INPUT_MENU");
 

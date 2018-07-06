@@ -71,7 +71,7 @@ public interface NamedConstants {
     /**
      * Time allowed before previously saved sessions are discarded
      */
-     public static int SAVED_SESSION_VALIDITY = 1; //HOURS
+     public static int SAVED_SESSION_VALIDITY = 30; //MINUTES
 
     /**
      * Thumbnail maximum width
@@ -227,6 +227,8 @@ public interface NamedConstants {
     public static final String USSD_SERVER_XML_HANDLER = "USSD_SERVER_XML_HANDLER";
     
     public static final String USSD_SERVER_JSON_HANDLER = "USSD_SERVER_JSON_HANDLER";
+    
+    public static final String JSON_API_SERVER_HANDLER = "JSON_API_SERVER_HANDLER";
 
     /**
      * A username that last modified a given auditable database entity

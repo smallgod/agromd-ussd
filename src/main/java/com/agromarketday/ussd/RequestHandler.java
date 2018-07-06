@@ -2,6 +2,7 @@ package com.agromarketday.ussd;
 
 import com.agromarketday.ussd.constant.ErrorCode;
 import com.agromarketday.ussd.constant.NamedConstants;
+import com.agromarketday.ussd.controller.JsonAPIServer;
 import com.agromarketday.ussd.controller.JsonProcessor;
 import com.agromarketday.ussd.controller.XmlProcessor;
 import com.agromarketday.ussd.exception.MyCustomException;
@@ -27,8 +28,9 @@ public class RequestHandler extends HttpServlet {
     //But you should also realize that you should never assign any request or session scoped data as 
     //an instance variable of a servlet or filter. It will be shared among all other requests in other sessions. 
     //That's threadunsafe!
-    //private static JsonProcessor processor; //i think this is not session scoped
-    private static XmlProcessor processor; //i think this is not session scoped
+    private static JsonProcessor processor; //i think this is not session scoped
+    //private static XmlProcessor processor; //i think this is not session scoped
+    private static JsonAPIServer jsonApiServer;
 
     /**
      * The init method is designed to be called only once. It is called when the
@@ -50,9 +52,12 @@ public class RequestHandler extends HttpServlet {
         ServletContext context = getServletContext();
 
         //appConfigs = (SharedAppConfigIF) context.getAttribute(NamedConstants.APPCONFIGS_ATTR_NAME);
-        processor = (XmlProcessor) context.getAttribute(NamedConstants.USSD_SERVER_XML_HANDLER);
-        //processor = (JsonProcessor) context.getAttribute(NamedConstants.USSD_SERVER_JSON_HANDLER);
-        logger.debug("init() method in JsonServlet called..");
+        jsonApiServer = (JsonAPIServer) context.getAttribute(NamedConstants.JSON_API_SERVER_HANDLER);
+        //processor = (XmlProcessor) context.getAttribute(NamedConstants.USSD_SERVER_XML_HANDLER);
+        processor = (JsonProcessor) context.getAttribute(NamedConstants.USSD_SERVER_JSON_HANDLER);
+        
+        
+
     }
 
     /**
@@ -79,20 +84,34 @@ public class RequestHandler extends HttpServlet {
     protected void processRequest(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
 
-        //response.setContentType("application/json");
-        response.setContentType("application/xml");
+        response.setContentType("application/json");
+        //response.setContentType("application/xml");
         response.setCharacterEncoding("UTF-8");
+
+        String requestUri = request.getRequestURI();
+        String path = requestUri.substring(requestUri.lastIndexOf("/") + 1);
+
+        GeneralUtils.logRequestInfo(request);
 
         try {
 
-            logger.debug("processRequest called in RequestHandler!");
+            logger.debug("processRequest called in RequestHandler - path: " + path);
 
-            if (processor == null) {
-                MyCustomException error = GeneralUtils.getSingleError(ErrorCode.BAD_STATE_ERR, "Server in bad state", "xmlProcessor object is NULL");
-                throw new ServletException("MyCustomException", error);
+            String responseToServer;
+            if (requestUri.equalsIgnoreCase("/api/json")) {
+
+                response.setContentType("application/json");
+                responseToServer = jsonApiServer.processClientRequest(request);
+
+            } else {
+
+                if (processor == null) {
+                    MyCustomException error = GeneralUtils.getSingleError(ErrorCode.BAD_STATE_ERR, "Server in bad state", "xmlProcessor object is NULL");
+                    throw new ServletException("MyCustomException", error);
+                }
+                responseToServer = processor.processClientRequest(request);
             }
 
-            String responseToServer = processor.processClientRequest(request);
             writeResponse(response, responseToServer);
 
         } catch (MyCustomException customException) {

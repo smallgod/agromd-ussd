@@ -83,7 +83,7 @@ public class InitialiseDBData {
                 menu41, menu42, menu43, menu44, menu45, menu46, menu47,
                 menu48, menu49, menu50, menu51, menu52, menu53, menu54,
                 menu55, menu56, menu57, menu58, menu59, menu60, menu61,
-                menu62, menu63, menu64;
+                menu62, menu63, menu64, menu65, menu66, menu67, menu68;
 
         Set<AgUssdMenu> menus = new HashSet<>();
         Set<AgMenuItemIndex> defaultMenuItems;
@@ -95,7 +95,7 @@ public class InitialiseDBData {
         menu1.setMenuType(MenuType.SELECT_STATIC_MENU); //change back to Dynamic menu after making it dynamic
         defaultMenuItems = new HashSet<>();
         defaultMenuItems.add(new AgMenuItemIndex("1001", 1));
-        defaultMenuItems.add(new AgMenuItemIndex("1002", 2));
+        //defaultMenuItems.add(new AgMenuItemIndex("1002", 2));
         menu1.setMenuItems(defaultMenuItems);
 
         //Main screen
@@ -104,17 +104,17 @@ public class InitialiseDBData {
         menu2.setMenuName(MenuName.MAIN_MENU);
         menu2.setMenuType(MenuType.SELECT_STATIC_MENU);
         defaultMenuItems = new HashSet<>();
-        defaultMenuItems.add(new AgMenuItemIndex("1010", 1));
-        defaultMenuItems.add(new AgMenuItemIndex("1008", 2));
+        defaultMenuItems.add(new AgMenuItemIndex("1019", 1));
+        defaultMenuItems.add(new AgMenuItemIndex("1010", 2));
+        defaultMenuItems.add(new AgMenuItemIndex("1008", 3));
         //defaultMenuItems.add(new AgMenuItemIndex("1018", 2));
-        defaultMenuItems.add(new AgMenuItemIndex("1019", 3));
         //defaultMenuItems.add(new AgMenuItemIndex("1011", 3));
         defaultMenuItems.add(new AgMenuItemIndex("1012", 4));
         defaultMenuItems.add(new AgMenuItemIndex("1013", 5));
-        //defaultMenuItems.add(new AgMenuItemIndex("1014", 7));
         //defaultMenuItems.add(new AgMenuItemIndex("1015", 8));
         defaultMenuItems.add(new AgMenuItemIndex("1016", 6));
-        defaultMenuItems.add(new AgMenuItemIndex("1017", 7));
+        defaultMenuItems.add(new AgMenuItemIndex("1014", 7));
+        defaultMenuItems.add(new AgMenuItemIndex("1017", 8));
         menu2.setMenuItems(defaultMenuItems);
 
         //Sales category
@@ -244,8 +244,8 @@ public class InitialiseDBData {
 
         menu18 = new AgUssdMenu();
         menu18.setMenuTitleText("1130");
-        menu18.setMenuName(MenuName.BUYER_LOCATION);
-        menu18.setMenuType(MenuType.SELECT_STATIC_MENU);
+        menu18.setMenuName(MenuName.ITEM_LOCATION);
+        menu18.setMenuType(MenuType.SELECT_STATIC_DYNAMIC_MENU);
         defaultMenuItems = new HashSet<>();
         defaultMenuItems.add(new AgMenuItemIndex("1131", 1));
         defaultMenuItems.add(new AgMenuItemIndex("1132", 2));
@@ -324,7 +324,7 @@ public class InitialiseDBData {
 
         menu27 = new AgUssdMenu();
         menu27.setMenuTitleText("1171");
-        menu27.setMenuName(MenuName.SELLER_LIST);
+        menu27.setMenuName(MenuName.BUYER_SELLER_LIST);
         menu27.setMenuType(MenuType.SELECT_DYNAMIC_MENU);
         menu27.setMenuItems(new HashSet<>());
 
@@ -489,35 +489,24 @@ public class InitialiseDBData {
         menu44.setMenuItems(defaultMenuItems);
 
         menu45 = new AgUssdMenu();
-        menu45.setMenuTitleText("1380"); //Compose on the fly
-        menu45.setMenuName(MenuName.LEARNING_SUBCATEGORY1); //should work for all check out scenarios
-        menu45.setMenuType(MenuType.SELECT_STATIC_MENU);
-        defaultMenuItems = new HashSet<>();
-        defaultMenuItems.add(new AgMenuItemIndex("1381", 1));
-        defaultMenuItems.add(new AgMenuItemIndex("1382", 2));
-        menu45.setMenuItems(defaultMenuItems);
+        menu45.setMenuTitleText("1380");
+        menu45.setMenuName(MenuName.FARMING_TIPS_CATEGORY);
+        menu45.setMenuType(MenuType.SELECT_DYNAMIC_MENU);
+        menu45.setMenuItems(new HashSet<>());
 
         menu47 = new AgUssdMenu();
-        menu47.setMenuTitleText("1400"); //Compose on the fly
-        menu47.setMenuName(MenuName.LEARNING_SUBCATEGORY2); //should work for all check out scenarios
-        menu47.setMenuType(MenuType.SELECT_STATIC_MENU);
-        defaultMenuItems = new HashSet<>();
-        defaultMenuItems.add(new AgMenuItemIndex("1401", 1));
-        defaultMenuItems.add(new AgMenuItemIndex("1402", 2));
-        defaultMenuItems.add(new AgMenuItemIndex("1403", 3));
-        defaultMenuItems.add(new AgMenuItemIndex("1404", 4));
-        menu47.setMenuItems(defaultMenuItems);
+        menu47.setMenuTitleText("1400");
+        menu47.setMenuName(MenuName.FARMING_TIPS_TOPICS);
+        menu47.setMenuType(MenuType.SELECT_DYNAMIC_MENU);
+        menu47.setMenuItems(new HashSet<>());
 
         menu48 = new AgUssdMenu();
-        menu48.setMenuTitleText("1410"); //Compose on the fly
-        menu48.setMenuName(MenuName.LEARNING_SUBCATEGORY3); //should work for all check out scenarios
-        menu48.setMenuType(MenuType.SELECT_STATIC_MENU);
-        defaultMenuItems = new HashSet<>();
-        defaultMenuItems.add(new AgMenuItemIndex("1411", 1));
-        defaultMenuItems.add(new AgMenuItemIndex("1412", 2));
-        defaultMenuItems.add(new AgMenuItemIndex("1413", 3));
-        defaultMenuItems.add(new AgMenuItemIndex("1414", 4));
-        menu48.setMenuItems(defaultMenuItems);
+        menu48.setMenuTitleText("1401");
+        menu48.setMenuName(MenuName.FARMING_TIPS_CHAPTERS);
+        menu48.setMenuType(MenuType.SELECT_DYNAMIC_MENU);
+        menu48.setMenuItems(new HashSet<>());
+
+       
 
         menu46 = new AgUssdMenu();
         menu46.setMenuTitleText("1420"); //Compose on the fly
@@ -587,8 +576,9 @@ public class InitialiseDBData {
         menu56.setMenuItems(new HashSet<>());
 
         menu57 = new AgUssdMenu();
-        menu57.setMenuTitleText("1190");
-        menu57.setMenuName(MenuName.MARKET_DISTRICTS);
+        menu57.setMenuTitleText("");
+        //menu57.setMenuTitleText("1190");
+        menu57.setMenuName(MenuName.MARKET_DISTRICT_PRICES);
         menu57.setMenuType(MenuType.SELECT_DYNAMIC_MENU);
         menu57.setMenuItems(new HashSet<>());
 
@@ -600,7 +590,7 @@ public class InitialiseDBData {
 
         menu59 = new AgUssdMenu();
         menu59.setMenuTitleText("1190");
-        menu59.setMenuName(MenuName.SELLER_DISTRICTS);
+        menu59.setMenuName(MenuName.BUYER_SELLER_DISTRICTS);
         menu59.setMenuType(MenuType.SELECT_DYNAMIC_MENU);
         menu59.setMenuItems(new HashSet<>());
 
@@ -621,6 +611,26 @@ public class InitialiseDBData {
         menu62.setMenuName(MenuName.MARKET_PRICES_END);
         menu62.setMenuType(MenuType.INPUT_MENU);
         menu62.setMenuItems(new HashSet<>());
+
+        menu63 = new AgUssdMenu();
+        menu63.setMenuTitleText("1612");
+        menu63.setMenuName(MenuName.SUCCESS_REGISTRATION);
+        menu63.setMenuType(MenuType.INPUT_MENU);
+        menu63.setMenuItems(new HashSet<>());
+        
+         menu64 = new AgUssdMenu();
+        menu64.setMenuTitleText("");
+        menu64.setMenuName(MenuName.FARMING_TIPS_CONTENT);
+        menu64.setMenuType(MenuType.INPUT_MENU);
+        menu64.setMenuItems(new HashSet<>());
+        
+        
+        menu65 = new AgUssdMenu();
+        menu65.setMenuTitleText("1190");
+        menu65.setMenuName(MenuName.SELECT_DISTRICT);
+        menu65.setMenuType(MenuType.SELECT_DYNAMIC_MENU);
+        menu65.setMenuItems(new HashSet<>());
+        
 
 //        menu45 = new AgUssdMenu();
 //        menu45.setMenuTitleText("1370"); 
@@ -717,6 +727,9 @@ public class InitialiseDBData {
         menus.add(menu60);
         menus.add(menu61);
         menus.add(menu62);
+        menus.add(menu63);
+        menus.add(menu64);
+        menus.add(menu65);
 
         menus.add(maintenanceMenu);
         menus.add(errorMenu);

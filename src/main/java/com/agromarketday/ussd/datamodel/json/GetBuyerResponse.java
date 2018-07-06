@@ -107,7 +107,7 @@ public class GetBuyerResponse {
 
         @SerializedName("buyer_id")
         @Expose
-        private int buyerId;
+        private String buyerId;
 
         @SerializedName("buyer_name")
         @Expose
@@ -129,11 +129,11 @@ public class GetBuyerResponse {
             this.buyerName = buyerName;
         }
 
-        public int getBuyerId() {
+        public String getBuyerId() {
             return buyerId;
         }
 
-        public void setBuyerId(int buyerId) {
+        public void setBuyerId(String buyerId) {
             this.buyerId = buyerId;
         }
 
@@ -149,6 +149,10 @@ public class GetBuyerResponse {
             return Collections.unmodifiableSet(buying);
         }
 
+        @Override
+        public int getCount() {
+            return -2;
+        }
         public void setBuying(Set<Product> buying) {
             this.buying = buying;
         }
@@ -157,7 +161,7 @@ public class GetBuyerResponse {
 
             @SerializedName("product_id")
             @Expose
-            private int productId;
+            private String productId;
 
             @SerializedName("product_name")
             @Expose
@@ -183,11 +187,11 @@ public class GetBuyerResponse {
             @Expose
             private Price buyingPrice;
 
-            public int getProductId() {
+            public String getProductId() {
                 return productId;
             }
 
-            public void setProductId(int productId) {
+            public void setProductId(String productId) {
                 this.productId = productId;
             }
 
@@ -240,10 +244,15 @@ public class GetBuyerResponse {
             }
 
             @Override
-            public int getId() {
+            public String getId() {
                 return productId;
             }
 
+            @Override
+        public int getCount() {
+            return -2;
+        }
+        
             @Override
             public String getName() {
                 return productName;
@@ -252,7 +261,7 @@ public class GetBuyerResponse {
         }
 
         @Override
-        public int getId() {
+        public String getId() {
             return buyerId;
         }
 

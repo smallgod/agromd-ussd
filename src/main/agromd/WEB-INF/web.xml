@@ -37,6 +37,8 @@
         <welcome-file>index.html</welcome-file>
     </welcome-file-list>
     
+    
+    
     <servlet>
         <servlet-name>RequestHandler</servlet-name>
         <servlet-class>com.agromarketday.ussd.RequestHandler</servlet-class>
@@ -50,8 +52,7 @@
         <servlet-name>RequestHandler</servlet-name>
         <url-pattern>/*</url-pattern>
     </servlet-mapping>
-        
-
+    
     <!-- Error Page Handler Servlet -->    
     <!--<servlet>
         <servlet-name>ErrorResponseHandler</servlet-name>

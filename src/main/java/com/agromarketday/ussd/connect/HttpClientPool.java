@@ -721,7 +721,6 @@ public final class HttpClientPool {
      * @param remoteRequest
      * 
      * @return string response
-     * @throws com.library.customexception.MyCustomException
      */
     public String sendRemoteRequest(String requestPayloadString, RemoteRequest remoteRequest) throws MyCustomException {
 
@@ -736,7 +735,8 @@ public final class HttpClientPool {
         //so do the future.get() ---- this is a blocking call and will consume resources be-ware and see how to minimise the effects of this
         try {
             
-            logger.debug("Sending remote rquest to: " + remoteRequest.getJsonUrl());
+            logger.debug("Sending remote request to: " + remoteRequest.getJsonUrl());
+            logger.debug("Request: " + requestPayloadString);
             
             responsePayload = future.get(60L, TimeUnit.SECONDS); //wait a max of 1 minute and terminate if exceeded
         } catch (InterruptedException | ExecutionException | TimeoutException ex) {

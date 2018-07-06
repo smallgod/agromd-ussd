@@ -3,7 +3,7 @@ package com.agromarketday.ussd.datamodel.json;
 import com.google.gson.annotations.Expose;
 import com.google.gson.annotations.SerializedName;
 
-public class GetSellersRequest {
+public class GetBuyerSellerRequest {
 
     /*
     
@@ -24,8 +24,9 @@ public class GetSellersRequest {
         "category_class":"inputs",
         "transport":"", //NATIONAL | ANY
         "district_id":"", 
-        "region":"CENTRAL", //mandatory -> WESTERN | EASTERN | 
-        "matched":true // or false -> when matching buyers/sellers
+        "region_id":99,  //for ALL regions, just pass '0' as an integer
+        "region":"CENTRAL", //mandatory -> WESTERN | EASTERN | ANY
+        "msisdn":"25677777877"
     }
 }
     
@@ -96,6 +97,10 @@ public class GetSellersRequest {
         @Expose
         private int districtId;
 
+        @SerializedName("region_id")
+        @Expose
+        private int regionId;
+
         @SerializedName("region")
         @Expose
         private String region;
@@ -103,6 +108,10 @@ public class GetSellersRequest {
         @SerializedName("is_matched")
         @Expose
         private boolean isMatched;
+        
+        @SerializedName("msisdn")
+        @Expose
+        private String msisdn;
 
         public Params() {
         }
@@ -162,5 +171,22 @@ public class GetSellersRequest {
         public void setIsMatched(boolean isMatched) {
             this.isMatched = isMatched;
         }
+
+        public int getRegionId() {
+            return regionId;
+        }
+
+        public void setRegionId(int regionId) {
+            this.regionId = regionId;
+        }
+
+        public String getMsisdn() {
+            return msisdn;
+        }
+
+        public void setMsisdn(String msisdn) {
+            this.msisdn = msisdn;
+        }
+
     }
 }

@@ -9,8 +9,10 @@ import com.agromarketday.ussd.constant.APIContentType;
 import com.agromarketday.ussd.constant.EntityName;
 import com.agromarketday.ussd.constant.ErrorCode;
 import com.agromarketday.ussd.constant.NamedConstants;
+import com.agromarketday.ussd.constant.NetworkId;
 import com.agromarketday.ussd.datamodel.AdAPIRequest;
 import com.agromarketday.ussd.datamodel.AgClient;
+import com.agromarketday.ussd.datamodel.json.MenuHistory;
 import com.agromarketday.ussd.exception.EmptyStringException;
 import com.agromarketday.ussd.exception.ErrorWrapper;
 import com.agromarketday.ussd.exception.MyCustomException;
@@ -186,11 +188,9 @@ public class GeneralUtils {
      * @return
      */
     public static String extractJsonFromSMSOneWorstAPIever(String inputStreamString) {
-        
+
         //string looks like this:
         ////------------------------------c6514c3a96aeContent-Disposition: form-data; name="ussdTransactionObject"{"transactionId":"13010904","transactionTime":"2018-01-17 16:07:13","serviceCode":"236","ussdDailedCode":"*236#","msisdn":"256774983602","ussdRequestString":"continue","userInput":"continue","response":"false","network":"MTN-UG","newRequest":true}------------------------------c6514c3a96ae--
-            
-
         int startIndex = inputStreamString.indexOf("name=\"ussdTransactionObject\"");
         String extractedString = inputStreamString.substring(startIndex + 1).trim();
 
@@ -1180,7 +1180,54 @@ public class GeneralUtils {
         return MSISDN;
     }
 
-    private static int createRandomInteger(int aStart, long aEnd, Random aRandom) {
+    public static NetworkId getNetworkId(String msisdn) {
+
+        String prefix = formatMSISDN(msisdn).substring(3, 5);
+        logger.debug("Network Prefix: " + prefix);
+
+        NetworkId networkId;
+        switch (prefix) {
+            //put all this in config
+            
+            
+
+            case "77":
+                networkId = NetworkId.MTN_UG;
+                break;
+
+            case "78":
+                networkId = NetworkId.MTN_UG;
+                break;
+
+            case "39":
+                networkId = NetworkId.MTN_UG;
+                break;
+
+            case "79":
+                networkId = NetworkId.AFRICELL_UG;
+                break;
+
+            case "70":
+                networkId = NetworkId.AIRTEL_UG;
+                break;
+
+            case "75":
+                networkId = NetworkId.AIRTEL_UG;
+                break;
+
+            case "71":
+                networkId = NetworkId.UTL;
+                break;
+
+            default:
+                networkId = NetworkId.UNKOWN;
+                break;
+        }
+        return networkId;
+
+    }
+
+    public static int createRandomInteger(int aStart, long aEnd, Random aRandom) {
 
         if (aStart > aEnd) {
             throw new IllegalArgumentException("Start cannot exceed End.");
@@ -1462,6 +1509,85 @@ public class GeneralUtils {
         String uploadId = stripString[0];
 
         return resourceName;
+    }
+
+    /**
+     * Get the JSON string from an HTTPServerletRequest
+     *
+     * @param request
+     * @return
+     * @throws MyCustomException
+     */
+    public static String getJsonStringFromRequest(HttpServletRequest request) {
+
+        StringBuilder sb = new StringBuilder();
+        BufferedReader reader = null;
+        String s;
+
+        try {
+
+            reader = request.getReader();
+
+            do {
+
+                s = reader.readLine();
+
+                if (s != null) {
+                    sb.append(s);
+                } else {
+                    break;
+                }
+
+            } while (true);
+
+        } catch (IOException ex) {
+            logger.error("IO Exception, failed to decode JSON string from request: " + ex.getMessage());
+            //throw new MyCustomException("IO Exception occurred", ErrorCode.CLIENT_ERR, "Failed to decode JSON string from the HTTP request: " + ex.getMessage(), ErrorCategory.CLIENT_ERR_TYPE);
+
+        } catch (Exception ex) {
+            logger.error("General Exception, failed to decode JSON string from request: " + ex.getMessage());
+            //throw new MyCustomException("General Exception occurred", ErrorCode.CLIENT_ERR, "Failed to decode JSON string from the HTTP request: " + ex.getMessage(), ErrorCategory.CLIENT_ERR_TYPE);
+
+        } finally {
+            if (reader != null) {
+                try {
+                    reader.close();
+                } catch (IOException ex) {
+                    logger.error("exception closing buffered reader: " + ex.getMessage());
+                }
+            }
+        }
+
+        return sb.toString();
+    }
+
+    public static MenuHistory getMenuHistoryHelper(String history)
+            throws MyCustomException {
+
+        MenuHistory menuHistory
+                = GeneralUtils.convertFromJson(history, MenuHistory.class);
+        GeneralUtils.toPrettyJson(history);
+
+        return menuHistory;
+    }
+
+    public static void logRequestInfo(HttpServletRequest request) {
+
+        logger.debug(">>> Request Content-type   : " + request.getContentType());
+        logger.debug(">>> Request Context-path   : " + request.getContextPath());
+        logger.debug(">>> Request Content-length : " + request.getContentLength());
+        logger.debug(">>> Request Protocol       : " + request.getProtocol());
+        logger.debug(">>> Request PathInfo       : " + request.getPathInfo());
+        logger.debug(">>> Request Path translated: " + request.getPathTranslated());
+        logger.debug(">>> Request Remote Address : " + request.getRemoteAddr());
+        logger.debug(">>> Request Remote Port    : " + request.getRemotePort());
+        logger.debug(">>> Request Server name    : " + request.getServerName());
+        logger.debug(">>> Request Querystring    : " + request.getQueryString());
+        logger.debug(">>> Request URL            : " + request.getRequestURL().toString());
+        logger.debug(">>> Request URI            : " + request.getRequestURI());
+        logger.debug(">>> Request URI last-Index : " + request.getRequestURI().lastIndexOf("/"));
+        logger.debug(">>> Request Method-name    : " + request.getRequestURI().substring(request.getRequestURI().lastIndexOf("/") + 1));
+
     }
 
 }
